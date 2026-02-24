@@ -1,4 +1,5 @@
-import { PDFParse } from 'pdf-parse';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require('pdf-parse');
 
 interface PDFExtractResult {
   text: string;
@@ -7,14 +8,9 @@ interface PDFExtractResult {
 }
 
 export async function extractTextFromPDF(buffer: Buffer): Promise<PDFExtractResult> {
-  const pdf = new PDFParse({ data: new Uint8Array(buffer) });
-  const textResult = await pdf.getText();
-  const infoResult = await pdf.getInfo();
-  await pdf.destroy();
+  const data = await pdfParse(buffer);
 
-  const rawText = textResult.text || '';
-
-  const text = rawText
+  const text = (data.text as string)
     // Strip control characters except newlines and tabs
     .replace(/[^\x20-\x7E\n\t]/g, ' ')
     // Collapse multiple spaces
@@ -23,11 +19,9 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<PDFExtractResu
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  const pageCount = infoResult.pages?.length ?? textResult.pages?.length ?? 0;
-
   return {
     text,
-    pageCount,
+    pageCount: data.numpages as number,
     characterCount: text.length,
   };
 }
