@@ -18,6 +18,7 @@ export async function generateVideo(
     replica_id: process.env.TAVUS_REPLICA_ID!,
     script,
     video_name: videoName || 'PDF to Video',
+    fast: true,
   };
 
   if (backgroundUrl) {
