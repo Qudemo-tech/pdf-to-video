@@ -30,8 +30,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<StitchVid
     });
   } catch (error) {
     console.error('Video stitching error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to stitch videos';
     return NextResponse.json(
-      { success: false, error: 'Failed to stitch videos' },
+      { success: false, error: message },
       { status: 500 }
     );
   }
