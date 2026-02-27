@@ -5,17 +5,23 @@ import StatusTracker from '@/components/StatusTracker';
 import PDFUploader from '@/components/PDFUploader';
 import ScriptEditor from '@/components/ScriptEditor';
 import VideoPlayer from '@/components/VideoPlayer';
-import { PipelineStep } from '@/types';
+import ModeSelector from '@/components/ModeSelector';
+import PageByPageFlow from '@/components/PageByPageFlow';
+import { PipelineStep, VideoMode } from '@/types';
 
 export default function Home() {
   const [currentStep, setCurrentStep] = useState<PipelineStep>('upload');
+  const [selectedMode, setSelectedMode] = useState<VideoMode | null>(null);
+
+  // PDF file reference (needed for page-by-page mode to re-upload for conversion)
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
 
   // Step 1 → 2 data
   const [extractedText, setExtractedText] = useState('');
   const [pageCount, setPageCount] = useState(0);
   const [characterCount, setCharacterCount] = useState(0);
 
-  // Step 2 → 3 data
+  // Step 2 → 3 data (summary mode)
   const [videoId, setVideoId] = useState('');
   const [hostedUrl, setHostedUrl] = useState('');
 
@@ -23,11 +29,21 @@ export default function Home() {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
 
-  const handleTextExtracted = (text: string, pages: number, chars: number) => {
+  const handleTextExtracted = (text: string, pages: number, chars: number, file?: File) => {
     setExtractedText(text);
     setPageCount(pages);
     setCharacterCount(chars);
-    setCurrentStep('script');
+    if (file) setPdfFile(file);
+    setCurrentStep('mode-select');
+  };
+
+  const handleModeSelect = (mode: VideoMode) => {
+    setSelectedMode(mode);
+    if (mode === 'summary') {
+      setCurrentStep('script');
+    } else {
+      setCurrentStep('page-by-page');
+    }
   };
 
   const handleVideoGenerate = async (script: string) => {
@@ -65,6 +81,8 @@ export default function Home() {
 
   const handleReset = () => {
     setCurrentStep('upload');
+    setSelectedMode(null);
+    setPdfFile(null);
     setExtractedText('');
     setPageCount(0);
     setCharacterCount(0);
@@ -84,8 +102,10 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Progress Tracker */}
-        <StatusTracker currentStep={currentStep} />
+        {/* Progress Tracker — only show for summary mode or before mode selection */}
+        {currentStep !== 'page-by-page' && (
+          <StatusTracker currentStep={currentStep} />
+        )}
 
         {/* Step Content */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
@@ -97,8 +117,13 @@ export default function Home() {
             </div>
           )}
 
-          {/* Step 2: Script */}
-          {currentStep === 'script' && (
+          {/* Step 1.5: Mode Selection */}
+          {currentStep === 'mode-select' && (
+            <ModeSelector onModeSelect={handleModeSelect} />
+          )}
+
+          {/* Step 2: Script (Summary Mode) */}
+          {currentStep === 'script' && selectedMode === 'summary' && (
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Generate Video Script</h2>
               {videoError && (
@@ -124,8 +149,8 @@ export default function Home() {
             </div>
           )}
 
-          {/* Step 3: Video */}
-          {currentStep === 'video' && videoId && (
+          {/* Step 3: Video (Summary Mode) */}
+          {currentStep === 'video' && videoId && selectedMode === 'summary' && (
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Video</h2>
               <VideoPlayer
@@ -134,6 +159,16 @@ export default function Home() {
                 onReset={handleReset}
               />
             </div>
+          )}
+
+          {/* Page-by-Page Mode */}
+          {currentStep === 'page-by-page' && pdfFile && (
+            <PageByPageFlow
+              pdfFile={pdfFile}
+              extractedText={extractedText}
+              pageCount={pageCount}
+              onReset={handleReset}
+            />
           )}
         </div>
 

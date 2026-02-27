@@ -74,4 +74,58 @@ export interface TavusVideoResponse {
   error_message?: string;
 }
 
-export type PipelineStep = 'upload' | 'extract' | 'script' | 'video' | 'complete';
+export type PipelineStep = 'upload' | 'extract' | 'mode-select' | 'script' | 'video' | 'page-by-page' | 'complete';
+
+export type VideoMode = 'summary' | 'page-by-page';
+
+export type PageByPageStep =
+  | 'converting-pages'
+  | 'generating-scripts'
+  | 'generating-videos'
+  | 'stitching'
+  | 'done'
+  | 'error';
+
+export interface PageScript {
+  pageNumber: number; // 0 = intro
+  script: string;
+  wordCount: number;
+}
+
+export interface PageVideo {
+  pageNumber: number; // 0 = intro
+  videoId: string;
+  status: VideoStatus;
+  hostedUrl?: string;
+  downloadUrl?: string;
+}
+
+export interface ConvertPagesResponse {
+  success: boolean;
+  imageUrls?: string[];
+  localPaths?: string[]; // absolute file paths for server-side PiP compositing
+  pageCount?: number;
+  error?: string;
+}
+
+export interface GeneratePageScriptsRequest {
+  textByPage: string[];
+  fullText: string;
+}
+
+export interface GeneratePageScriptsResponse {
+  success: boolean;
+  scripts?: PageScript[];
+  error?: string;
+}
+
+export interface StitchVideosRequest {
+  videoUrls: string[];
+  imageUrls?: string[]; // local file paths for PiP compositing (index 0 = page 1)
+}
+
+export interface StitchVideosResponse {
+  success: boolean;
+  outputUrl?: string;
+  error?: string;
+}

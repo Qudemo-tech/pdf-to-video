@@ -8,6 +8,7 @@ interface StatusTrackerProps {
 
 const steps: { key: PipelineStep; label: string }[] = [
   { key: 'upload', label: 'Upload PDF' },
+  { key: 'mode-select', label: 'Choose Mode' },
   { key: 'script', label: 'Generate Script' },
   { key: 'video', label: 'Create Video' },
   { key: 'complete', label: 'Done' },
@@ -15,6 +16,7 @@ const steps: { key: PipelineStep; label: string }[] = [
 
 function getStepIndex(step: PipelineStep): number {
   if (step === 'extract') return 0; // extract is part of upload step
+  if (step === 'page-by-page') return 1; // page-by-page is after mode select
   return steps.findIndex((s) => s.key === step);
 }
 

@@ -72,3 +72,78 @@ ${truncatedText}`;
     estimatedDurationSeconds,
   };
 }
+
+/**
+ * Generate page-by-page scripts: one intro + one per page.
+ * Each script is ~25 words (~10 seconds of speech).
+ */
+export async function generatePageScripts(
+  textByPage: string[],
+  fullText: string
+): Promise<{ pageNumber: number; script: string; wordCount: number }[]> {
+  const truncatedFull = fullText.length > 10000 ? fullText.substring(0, 10000) : fullText;
+
+  // Build prompt for all scripts at once
+  const pageDescriptions = textByPage
+    .map((text, i) => `--- PAGE ${i + 1} ---\n${text.substring(0, 2000)}`)
+    .join('\n\n');
+
+  const userMessage = `You are writing scripts for a page-by-page video explainer of a PDF document.
+
+FULL DOCUMENT OVERVIEW (for context):
+${truncatedFull.substring(0, 3000)}
+
+PAGE CONTENTS:
+${pageDescriptions}
+
+Generate scripts as follows:
+1. INTRO script (~25 words): A brief overview of what this document covers. This plays full-screen with just the avatar. Start with something engaging.
+2. One script PER PAGE (~25 words each): A short explanation of what that specific page contains. These play with the page image as background.
+
+RULES:
+- Each script must be EXACTLY around 20-30 words. Be concise.
+- Write in first person, speaking directly to the viewer.
+- Do NOT use markdown, bullet points, or any formatting.
+- Do NOT include labels like "INTRO:" or "PAGE 1:".
+- Output ONLY the spoken text.
+
+Format your response as JSON array:
+[
+  {"pageNumber": 0, "script": "intro script here..."},
+  {"pageNumber": 1, "script": "page 1 script here..."},
+  {"pageNumber": 2, "script": "page 2 script here..."}
+]
+
+Output ONLY valid JSON, nothing else.`;
+
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5-20250929',
+    max_tokens: 4096,
+    system: 'You are a concise video script writer. Output only valid JSON as requested.',
+    messages: [{ role: 'user', content: userMessage }],
+  });
+
+  const responseText = message.content
+    .filter((block) => block.type === 'text')
+    .map((block) => {
+      if (block.type === 'text') return block.text;
+      return '';
+    })
+    .join('')
+    .trim();
+
+  // Parse JSON from response (handle potential markdown code block wrapping)
+  let jsonStr = responseText;
+  const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+  if (jsonMatch) {
+    jsonStr = jsonMatch[0];
+  }
+
+  const parsed: { pageNumber: number; script: string }[] = JSON.parse(jsonStr);
+
+  return parsed.map((item) => ({
+    pageNumber: item.pageNumber,
+    script: item.script,
+    wordCount: item.script.split(/\s+/).length,
+  }));
+}

@@ -3,7 +3,7 @@
 import { useCallback, useState, useRef } from 'react';
 
 interface PDFUploaderProps {
-  onTextExtracted: (text: string, pageCount: number, characterCount: number) => void;
+  onTextExtracted: (text: string, pageCount: number, characterCount: number, file?: File) => void;
 }
 
 export default function PDFUploader({ onTextExtracted }: PDFUploaderProps) {
@@ -83,7 +83,7 @@ export default function PDFUploader({ onTextExtracted }: PDFUploaderProps) {
         return;
       }
 
-      onTextExtracted(data.text, data.pageCount, data.characterCount);
+      onTextExtracted(data.text, data.pageCount, data.characterCount, file);
     } catch {
       setError('Failed to upload and extract text. Please try again.');
     } finally {
