@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState, useRef } from 'react';
+import { API_BASE } from '@/lib/api';
 
 interface PDFUploaderProps {
   onTextExtracted: (text: string, pageCount: number, characterCount: number, file?: File) => void;
@@ -71,7 +72,7 @@ export default function PDFUploader({ onTextExtracted }: PDFUploaderProps) {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/extract-text', {
+      const response = await fetch(`${API_BASE}/api/extract-text`, {
         method: 'POST',
         body: formData,
       });

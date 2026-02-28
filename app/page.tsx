@@ -8,6 +8,7 @@ import VideoPlayer from '@/components/VideoPlayer';
 import ModeSelector from '@/components/ModeSelector';
 import PageByPageFlow from '@/components/PageByPageFlow';
 import { PipelineStep, VideoMode } from '@/types';
+import { API_BASE } from '@/lib/api';
 
 export default function Home() {
   const [currentStep, setCurrentStep] = useState<PipelineStep>('upload');
@@ -52,7 +53,7 @@ export default function Home() {
     setCurrentStep('video');
 
     try {
-      const response = await fetch('/api/generate-video', {
+      const response = await fetch(`${API_BASE}/api/generate-video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

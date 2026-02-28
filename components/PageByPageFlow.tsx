@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { PageByPageStep, PageScript, PageVideo } from '@/types';
+import { API_BASE } from '@/lib/api';
 
 interface PageByPageFlowProps {
   pdfFile: File;
@@ -57,7 +58,7 @@ export default function PageByPageFlow({
       }
 
       try {
-        const res = await fetch(`/api/video-status?videoId=${updated[i].videoId}`);
+        const res = await fetch(`${API_BASE}/api/video-status?videoId=${updated[i].videoId}`);
         const data = await res.json();
         if (data.success) {
           updated[i] = {
@@ -102,7 +103,7 @@ export default function PageByPageFlow({
         const formData = new FormData();
         formData.append('file', pdfFile);
 
-        const convertRes = await fetch('/api/convert-pages', {
+        const convertRes = await fetch(`${API_BASE}/api/convert-pages`, {
           method: 'POST',
           body: formData,
         });
@@ -119,7 +120,7 @@ export default function PageByPageFlow({
         // Split text by page (best effort)
         const textByPage = splitTextByPage(extractedText, pageCount);
 
-        const scriptsRes = await fetch('/api/generate-page-scripts', {
+        const scriptsRes = await fetch(`${API_BASE}/api/generate-page-scripts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -150,7 +151,7 @@ export default function PageByPageFlow({
               : `Page ${scriptItem.pageNumber}`,
           };
 
-          const videoRes = await fetch('/api/generate-video', {
+          const videoRes = await fetch(`${API_BASE}/api/generate-video`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -188,7 +189,7 @@ export default function PageByPageFlow({
           throw new Error('No download URLs available for stitching');
         }
 
-        const stitchRes = await fetch('/api/stitch-videos', {
+        const stitchRes = await fetch(`${API_BASE}/api/stitch-videos`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

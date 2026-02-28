@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Tone } from '@/types';
+import { API_BASE } from '@/lib/api';
 
 interface ScriptEditorProps {
   extractedText: string;
@@ -43,7 +44,7 @@ export default function ScriptEditor({
     setError(null);
 
     try {
-      const response = await fetch('/api/generate-script', {
+      const response = await fetch(`${API_BASE}/api/generate-script`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

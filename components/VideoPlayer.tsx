@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { VideoStatus } from '@/types';
+import { API_BASE } from '@/lib/api';
 
 interface VideoPlayerProps {
   videoId: string;
@@ -21,7 +22,7 @@ export default function VideoPlayer({ videoId, initialHostedUrl, onReset }: Vide
 
   const pollStatus = useCallback(async () => {
     try {
-      const response = await fetch(`/api/video-status?videoId=${videoId}`);
+      const response = await fetch(`${API_BASE}/api/video-status?videoId=${videoId}`);
       const data = await response.json();
 
       if (data.success) {
