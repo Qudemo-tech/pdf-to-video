@@ -1,6 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import Navbar from '@/components/landing/Navbar';
+import HeroSection from '@/components/landing/HeroSection';
+import FeatureStrip from '@/components/landing/FeatureStrip';
+import DemoSection from '@/components/landing/DemoSection';
+import HowItWorks from '@/components/landing/HowItWorks';
+import UseCases from '@/components/landing/UseCases';
+import PricingSection from '@/components/landing/PricingSection';
+import Footer from '@/components/landing/Footer';
 import StatusTracker from '@/components/StatusTracker';
 import PDFUploader from '@/components/PDFUploader';
 import ScriptEditor from '@/components/ScriptEditor';
@@ -93,91 +102,109 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="max-w-3xl mx-auto px-4 py-12">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-gray-900">PDF to Video Converter</h1>
-          <p className="mt-2 text-gray-600">
-            Upload a PDF, generate a script, and create a talking-head video
-          </p>
-        </div>
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <HeroSection />
+      <FeatureStrip />
+      <DemoSection />
+      <HowItWorks />
+      <UseCases />
 
-        {/* Progress Tracker — only show for summary mode or before mode selection */}
-        {currentStep !== 'page-by-page' && (
-          <StatusTracker currentStep={currentStep} />
-        )}
+      {/* Upload / App Section */}
+      <section id="upload" className="section-padding grain-overlay">
+        <div className="container mx-auto max-w-3xl relative z-10">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-3xl md:text-4xl font-bold text-foreground text-center mb-4"
+          >
+            Try It Now
+          </motion.h2>
+          <p className="text-center text-muted-foreground mb-12">Upload your PDF and watch the magic happen.</p>
 
-        {/* Step Content */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
-          {/* Step 1: Upload */}
-          {currentStep === 'upload' && (
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload Your PDF</h2>
-              <PDFUploader onTextExtracted={handleTextExtracted} />
-            </div>
+          {/* Progress Tracker — only show for summary mode or before mode selection */}
+          {currentStep !== 'page-by-page' && (
+            <StatusTracker currentStep={currentStep} />
           )}
 
-          {/* Step 1.5: Mode Selection */}
-          {currentStep === 'mode-select' && (
-            <ModeSelector onModeSelect={handleModeSelect} />
-          )}
+          {/* Step Content */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="glass-card p-6 md:p-8"
+          >
+            {/* Step 1: Upload */}
+            {currentStep === 'upload' && (
+              <div>
+                <h2 className="text-xl font-semibold text-foreground mb-4">Upload Your PDF</h2>
+                <PDFUploader onTextExtracted={handleTextExtracted} />
+              </div>
+            )}
 
-          {/* Step 2: Script (Summary Mode) */}
-          {currentStep === 'script' && selectedMode === 'summary' && (
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Generate Video Script</h2>
-              {videoError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                  <p className="text-sm text-red-700">{videoError}</p>
-                </div>
-              )}
-              <ScriptEditor
+            {/* Step 1.5: Mode Selection */}
+            {currentStep === 'mode-select' && (
+              <ModeSelector onModeSelect={handleModeSelect} />
+            )}
+
+            {/* Step 2: Script (Summary Mode) */}
+            {currentStep === 'script' && selectedMode === 'summary' && (
+              <div>
+                <h2 className="text-xl font-semibold text-foreground mb-4">Generate Video Script</h2>
+                {videoError && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-destructive">{videoError}</p>
+                  </div>
+                )}
+                <ScriptEditor
+                  extractedText={extractedText}
+                  pageCount={pageCount}
+                  characterCount={characterCount}
+                  onVideoGenerate={handleVideoGenerate}
+                />
+                {isGeneratingVideo && (
+                  <div className="mt-4 flex items-center justify-center gap-2 text-primary">
+                    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="text-sm font-medium">Starting video generation...</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 3: Video (Summary Mode) */}
+            {currentStep === 'video' && videoId && selectedMode === 'summary' && (
+              <div>
+                <h2 className="text-xl font-semibold text-foreground mb-4">Your Video</h2>
+                <VideoPlayer
+                  videoId={videoId}
+                  initialHostedUrl={hostedUrl}
+                  onReset={handleReset}
+                />
+              </div>
+            )}
+
+            {/* Page-by-Page Mode */}
+            {currentStep === 'page-by-page' && pdfFile && (
+              <PageByPageFlow
+                pdfFile={pdfFile}
                 extractedText={extractedText}
                 pageCount={pageCount}
-                characterCount={characterCount}
-                onVideoGenerate={handleVideoGenerate}
-              />
-              {isGeneratingVideo && (
-                <div className="mt-4 flex items-center justify-center gap-2 text-blue-600">
-                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  <span className="text-sm font-medium">Starting video generation...</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 3: Video (Summary Mode) */}
-          {currentStep === 'video' && videoId && selectedMode === 'summary' && (
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Video</h2>
-              <VideoPlayer
-                videoId={videoId}
-                initialHostedUrl={hostedUrl}
                 onReset={handleReset}
               />
-            </div>
-          )}
-
-          {/* Page-by-Page Mode */}
-          {currentStep === 'page-by-page' && pdfFile && (
-            <PageByPageFlow
-              pdfFile={pdfFile}
-              extractedText={extractedText}
-              pageCount={pageCount}
-              onReset={handleReset}
-            />
-          )}
+            )}
+          </motion.div>
         </div>
+      </section>
 
-        {/* Footer */}
-        <p className="text-center text-xs text-gray-400 mt-8">
-          Powered by Claude AI &amp; Tavus
-        </p>
+      <div id="pricing">
+        <PricingSection />
       </div>
-    </main>
+      <Footer />
+    </div>
   );
 }

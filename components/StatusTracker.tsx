@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { Check } from 'lucide-react';
 import { PipelineStep } from '@/types';
 
 interface StatusTrackerProps {
@@ -33,26 +35,27 @@ export default function StatusTracker({ currentStep }: StatusTrackerProps) {
           return (
             <div key={step.key} className="flex items-center flex-1 last:flex-none">
               <div className="flex flex-col items-center">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: index * 0.1 }}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${
                     isCompleted
-                      ? 'bg-green-500 text-white'
+                      ? 'bg-primary text-primary-foreground glow-primary'
                       : isCurrent
-                        ? 'bg-blue-600 text-white ring-4 ring-blue-200'
-                        : 'bg-gray-200 text-gray-500'
+                        ? 'bg-primary text-primary-foreground ring-4 ring-primary/30'
+                        : 'bg-secondary text-muted-foreground'
                   }`}
                 >
                   {isCompleted ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+                    <Check className="w-5 h-5" />
                   ) : (
                     index + 1
                   )}
-                </div>
+                </motion.div>
                 <span
-                  className={`mt-2 text-xs font-medium ${
-                    isCompleted ? 'text-green-600' : isCurrent ? 'text-blue-600' : 'text-gray-400'
+                  className={`mt-2 text-xs font-medium transition-colors duration-300 ${
+                    isCompleted ? 'text-primary' : isCurrent ? 'text-foreground' : 'text-muted-foreground'
                   }`}
                 >
                   {step.label}
@@ -60,8 +63,8 @@ export default function StatusTracker({ currentStep }: StatusTrackerProps) {
               </div>
               {index < steps.length - 1 && (
                 <div
-                  className={`flex-1 h-0.5 mx-3 mt-[-1.25rem] ${
-                    index < currentIndex ? 'bg-green-500' : 'bg-gray-200'
+                  className={`flex-1 h-0.5 mx-3 mt-[-1.25rem] transition-colors duration-500 ${
+                    index < currentIndex ? 'bg-primary' : 'bg-secondary'
                   }`}
                 />
               )}

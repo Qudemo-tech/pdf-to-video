@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Check, AlertCircle, Download, RotateCcw, ChevronRight } from 'lucide-react';
 import { PageByPageStep, PageScript, PageVideo } from '@/types';
 import { API_BASE } from '@/lib/api';
 
@@ -219,7 +221,7 @@ export default function PageByPageFlow({
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900">Page-by-Page Video</h2>
+      <h2 className="text-xl font-semibold text-foreground">Page-by-Page Video</h2>
 
       {/* Progress Steps */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
@@ -231,21 +233,29 @@ export default function PageByPageFlow({
             <div key={s} className="flex items-center">
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <div
-                  className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                  className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
                     isCompleted
-                      ? 'bg-green-500'
+                      ? 'bg-primary/20'
                       : isCurrent
-                        ? 'bg-blue-600 animate-pulse'
-                        : 'bg-gray-300'
+                        ? 'bg-primary/20'
+                        : 'bg-secondary'
                   }`}
-                />
+                >
+                  {isCompleted ? (
+                    <Check className="w-3.5 h-3.5 text-primary" />
+                  ) : isCurrent ? (
+                    <div className="w-2.5 h-2.5 rounded-full bg-primary animate-progress-pulse" />
+                  ) : (
+                    <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                  )}
+                </div>
                 <span
-                  className={`text-xs font-medium ${
+                  className={`text-xs font-medium transition-colors duration-300 ${
                     isCompleted
-                      ? 'text-green-600'
+                      ? 'text-primary'
                       : isCurrent
-                        ? 'text-blue-600'
-                        : 'text-gray-400'
+                        ? 'text-foreground'
+                        : 'text-muted-foreground/50'
                   }`}
                 >
                   {STEP_LABELS[s]}
@@ -255,9 +265,7 @@ export default function PageByPageFlow({
                 </span>
               </div>
               {index < STEPS_ORDER.length - 2 && (
-                <svg className="w-4 h-4 text-gray-300 mx-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+                <ChevronRight className="w-4 h-4 text-muted-foreground mx-1 flex-shrink-0" />
               )}
             </div>
           );
@@ -266,79 +274,100 @@ export default function PageByPageFlow({
 
       {/* Status Message */}
       {step !== 'done' && step !== 'error' && (
-        <div className="text-center space-y-3 py-8">
-          <div className="w-12 h-12 mx-auto">
-            <svg className="animate-spin w-12 h-12 text-blue-600" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-4 py-8"
+        >
+          {/* Waveform animation */}
+          <div className="flex items-center justify-center gap-1 mb-2">
+            {Array.from({ length: 20 }).map((_, i) => (
+              <div
+                key={i}
+                className="w-1 bg-primary/30 rounded-full animate-pulse-glow"
+                style={{
+                  height: `${12 + Math.sin(i * 0.8) * 10}px`,
+                  animationDelay: `${i * 0.1}s`,
+                }}
+              />
+            ))}
           </div>
-          <p className="text-sm text-gray-600">
+
+          <p className="text-sm text-muted-foreground">
             {step === 'converting-pages' && 'Converting PDF pages to images...'}
             {step === 'generating-scripts' && 'Generating narration scripts for each page...'}
             {step === 'generating-videos' && `Generating videos... ${videosReady} of ${totalVideos} ready`}
             {step === 'stitching' && 'Stitching all videos into one...'}
           </p>
           {step === 'generating-videos' && totalVideos > 0 && (
-            <div className="w-64 mx-auto bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${(videosReady / totalVideos) * 100}%` }}
+            <div className="w-64 mx-auto bg-secondary rounded-full h-2 overflow-hidden">
+              <motion.div
+                className="bg-primary h-2 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${(videosReady / totalVideos) * 100}%` }}
+                transition={{ duration: 0.5 }}
               />
             </div>
           )}
           {(step === 'generating-videos' || step === 'stitching') && (
-            <p className="text-xs text-gray-400">This may take several minutes</p>
+            <p className="text-xs text-muted-foreground">This may take several minutes</p>
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* Error State */}
       {step === 'error' && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center space-y-3">
-          <div className="w-12 h-12 mx-auto bg-red-100 rounded-full flex items-center justify-center">
-            <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-destructive/10 border border-destructive/20 rounded-xl p-6 text-center space-y-3"
+        >
+          <div className="w-12 h-12 mx-auto bg-destructive/20 rounded-full flex items-center justify-center">
+            <AlertCircle className="w-6 h-6 text-destructive" />
           </div>
-          <p className="text-sm text-red-700">{error}</p>
-        </div>
+          <p className="text-sm text-destructive">{error}</p>
+        </motion.div>
       )}
 
       {/* Done State — Video Player */}
       {step === 'done' && outputVideoUrl && (
-        <div className="space-y-4">
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-            <p className="text-sm text-green-700 font-medium">Your page-by-page video is ready!</p>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="space-y-4"
+        >
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 text-center">
+            <p className="text-sm text-primary font-medium">Your page-by-page video is ready!</p>
           </div>
 
-          <div className="aspect-video bg-black rounded-lg overflow-hidden">
-            <video
-              src={outputVideoUrl}
-              controls
-              className="w-full h-full"
-            />
+          <div className="glass-card overflow-hidden glow-border">
+            <div className="aspect-video bg-card">
+              <video
+                src={outputVideoUrl}
+                controls
+                className="w-full h-full object-cover"
+              />
+            </div>
           </div>
 
           <a
             href={outputVideoUrl}
             download
-            className="w-full py-3 px-4 bg-blue-600 text-white text-center font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+            className="btn-primary-glow w-full flex items-center justify-center gap-2 text-center"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
+            <Download className="w-5 h-5" />
             Download Video
           </a>
-        </div>
+        </motion.div>
       )}
 
       {/* Start Over */}
-      <div className="pt-4 border-t border-gray-200">
+      <div className="pt-4 border-t border-white/[0.08]">
         <button
           onClick={onReset}
-          className="w-full py-3 px-4 bg-gray-100 text-gray-600 font-medium rounded-lg hover:bg-gray-200 transition-colors"
+          className="btn-ghost-outline w-full flex items-center justify-center gap-2"
         >
+          <RotateCcw className="w-4 h-4" />
           Start Over
         </button>
       </div>

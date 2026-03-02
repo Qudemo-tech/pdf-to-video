@@ -1,0 +1,148 @@
+'use client';
+
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+
+const DEMO_VIDEO = 'https://storage.cloud.google.com/pdftovideo/6d4bd452.mp4';
+
+const heroContent = {
+  teams: {
+    sub: 'Close deals faster. Replace decks with 2-minute video pitches your clients will actually watch.',
+  },
+  educators: {
+    sub: 'Turn your lecture slides into video lessons your students can replay, rewind, and actually retain.',
+  },
+};
+
+const logos = ['Notion', 'Linear', 'Vercel', 'Stripe', 'Figma', 'Loom'];
+
+export default function HeroSection() {
+  const [audience, setAudience] = useState<'teams' | 'educators'>('teams');
+
+  return (
+    <section className="relative min-h-screen flex items-center section-padding grain-overlay overflow-hidden pt-24">
+      {/* Background glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/10 blur-[150px] pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full bg-accent/5 blur-[120px] pointer-events-none" />
+
+      <div className="container mx-auto max-w-7xl relative z-10">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          {/* Left - Copy */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7 }}
+          >
+            <h1 className="text-4xl sm:text-5xl lg:text-[64px] font-bold leading-[1.05] tracking-[-0.02em] text-foreground mb-6">
+              Stop Sending Slides.{' '}
+              <span className="text-gradient-primary">Send Videos That Convert.</span>
+            </h1>
+
+            {/* Audience toggle */}
+            <div className="flex items-center gap-1 mb-5 bg-secondary rounded-full p-1 w-fit">
+              {(['teams', 'educators'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setAudience(t)}
+                  className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    audience === t
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {t === 'teams' ? 'For Teams' : 'For Educators'}
+                </button>
+              ))}
+            </div>
+
+            <motion.p
+              key={audience}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="text-lg sm:text-xl text-muted-foreground leading-relaxed mb-8 max-w-xl"
+            >
+              {heroContent[audience].sub}
+            </motion.p>
+
+            <div className="flex flex-wrap gap-4 mb-10">
+              <a href="#upload" className="btn-primary-glow inline-block">
+                Convert Your First PDF Free &rarr;
+              </a>
+              <a href="#demo" className="btn-ghost-outline inline-block">
+                See How It Works
+              </a>
+            </div>
+
+            {/* Trust bar */}
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Trusted by 12,000+ teams at</p>
+              <div className="flex items-center gap-6 flex-wrap">
+                {logos.map((name) => (
+                  <span
+                    key={name}
+                    className="text-muted-foreground/50 font-semibold text-sm tracking-wider uppercase"
+                  >
+                    {name}
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 flex-wrap">
+                <span>850K+ videos created</span>
+                <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                <span>4.9&#9733; on Product Hunt</span>
+                <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                <span>SOC 2 Compliant</span>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Right - Video mockup */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="relative"
+          >
+            {/* Floating PDF thumbnails */}
+            <div className="absolute -top-8 -left-8 w-20 h-28 glass-card p-1 animate-slide-transform opacity-60 hidden lg:block">
+              <div className="w-full h-full bg-muted/30 rounded-md flex items-center justify-center text-xs text-muted-foreground">PDF</div>
+            </div>
+            <div className="absolute -bottom-6 -right-6 w-16 h-22 glass-card p-1 animate-slide-transform opacity-40 hidden lg:block" style={{ animationDelay: '2s' }}>
+              <div className="w-full h-full bg-muted/30 rounded-md flex items-center justify-center text-xs text-muted-foreground">PPTX</div>
+            </div>
+            <div className="absolute top-1/2 -right-10 w-14 h-20 glass-card p-1 animate-float opacity-30 hidden lg:block">
+              <div className="w-full h-full bg-muted/30 rounded-md flex items-center justify-center text-xs text-muted-foreground">PDF</div>
+            </div>
+
+            {/* Browser frame */}
+            <div className="glass-card overflow-hidden glow-border">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06]">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-white/10" />
+                  <div className="w-3 h-3 rounded-full bg-white/10" />
+                  <div className="w-3 h-3 rounded-full bg-white/10" />
+                </div>
+                <div className="flex-1 mx-4">
+                  <div className="bg-white/[0.06] rounded-md px-3 py-1 text-xs text-muted-foreground text-center">
+                    slidetovideo.ai/demo
+                  </div>
+                </div>
+              </div>
+              <div className="aspect-video bg-card">
+                <video
+                  src={DEMO_VIDEO}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}

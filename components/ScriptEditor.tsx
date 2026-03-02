@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
 import { Tone } from '@/types';
 import { API_BASE } from '@/lib/api';
 
@@ -84,25 +86,25 @@ export default function ScriptEditor({
       {/* Extracted Text Panel */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-gray-700">Extracted Text</h3>
-          <span className="text-xs text-gray-500">
+          <h3 className="text-sm font-semibold text-foreground">Extracted Text</h3>
+          <span className="text-xs text-muted-foreground">
             {pageCount} pages &middot; {characterCount.toLocaleString()} characters
           </span>
         </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-48 overflow-y-auto">
-          <p className="text-sm text-gray-600 whitespace-pre-wrap">{extractedText}</p>
+        <div className="bg-secondary border border-white/[0.08] rounded-lg p-4 max-h-48 overflow-y-auto">
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{extractedText}</p>
         </div>
       </div>
 
       {/* Controls */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tone</label>
+          <label className="text-xs font-medium text-muted-foreground block mb-2">Tone</label>
           <select
             value={tone}
             onChange={(e) => setTone(e.target.value as Tone)}
             disabled={isGenerating}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+            className="w-full bg-secondary border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
           >
             {toneOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -112,12 +114,12 @@ export default function ScriptEditor({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Target Duration</label>
+          <label className="text-xs font-medium text-muted-foreground block mb-2">Target Duration</label>
           <select
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
             disabled={isGenerating}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+            className="w-full bg-secondary border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
           >
             {durationOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -132,7 +134,7 @@ export default function ScriptEditor({
       <button
         onClick={handleGenerateScript}
         disabled={isGenerating}
-        className="w-full py-3 px-4 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+        className="btn-primary-glow w-full flex items-center justify-center gap-2"
       >
         {isGenerating ? (
           <>
@@ -143,46 +145,66 @@ export default function ScriptEditor({
             Generating Script (5-10 seconds)...
           </>
         ) : scriptGenerated ? (
-          'Regenerate Script'
+          <>
+            <Sparkles className="w-5 h-5" />
+            Regenerate Script
+          </>
         ) : (
-          'Generate Script'
+          <>
+            <Sparkles className="w-5 h-5" />
+            Generate Script
+          </>
         )}
       </button>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <p className="text-sm text-red-700">{error}</p>
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-destructive/10 border border-destructive/20 rounded-lg p-3"
+          >
+            <p className="text-sm text-destructive">{error}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Script Editor */}
-      {scriptGenerated && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-700">Video Script</h3>
-            <span className="text-xs text-gray-500">
-              {wordCount} words &middot; ~{estimatedDuration}s
-            </span>
-          </div>
-          <textarea
-            value={script}
-            onChange={(e) => handleScriptChange(e.target.value)}
-            rows={10}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
-            placeholder="Your video script will appear here..."
-          />
-          <p className="text-xs text-gray-500">
-            You can edit the script above before generating the video.
-          </p>
-          <button
-            onClick={() => onVideoGenerate(script)}
-            disabled={!script.trim()}
-            className="w-full py-3 px-4 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      <AnimatePresence>
+        {scriptGenerated && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-3"
           >
-            Generate Video
-          </button>
-        </div>
-      )}
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">Video Script</h3>
+              <span className="text-xs text-muted-foreground">
+                {wordCount} words &middot; ~{estimatedDuration}s
+              </span>
+            </div>
+            <textarea
+              value={script}
+              onChange={(e) => handleScriptChange(e.target.value)}
+              rows={10}
+              className="w-full px-4 py-3 bg-secondary border border-white/[0.08] rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-y placeholder:text-muted-foreground"
+              placeholder="Your video script will appear here..."
+            />
+            <p className="text-xs text-muted-foreground">
+              You can edit the script above before generating the video.
+            </p>
+            <button
+              onClick={() => onVideoGenerate(script)}
+              disabled={!script.trim()}
+              className="btn-primary-glow w-full flex items-center justify-center gap-2 !bg-accent"
+              style={{ boxShadow: '0 0 40px rgba(7, 182, 213, 0.4), 0 4px 16px rgba(7, 182, 213, 0.25)' }}
+            >
+              Generate Video
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
