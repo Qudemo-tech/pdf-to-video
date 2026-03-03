@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
+import { GetStartedButton } from '@/components/GetStartedButton';
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -17,9 +18,12 @@ export default function Navbar() {
           <a href="#demo" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Demo</a>
           <a href="#upload" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Try It</a>
           <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
-          <a href="#upload" className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:brightness-110 transition-all">
+          <GetStartedButton
+            className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:brightness-110 transition-all"
+            showLogoutWhenSignedIn
+          >
             Get Started
-          </a>
+          </GetStartedButton>
         </div>
 
         <button onClick={() => setOpen(!open)} className="md:hidden text-foreground">
@@ -32,9 +36,13 @@ export default function Navbar() {
           <a href="#demo" onClick={() => setOpen(false)} className="block text-sm text-muted-foreground py-2">Demo</a>
           <a href="#upload" onClick={() => setOpen(false)} className="block text-sm text-muted-foreground py-2">Try It</a>
           <a href="#pricing" onClick={() => setOpen(false)} className="block text-sm text-muted-foreground py-2">Pricing</a>
-          <a href="#upload" onClick={() => setOpen(false)} className="block text-center px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
+          <GetStartedButton
+            className="block text-center px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium w-full"
+            onClick={() => setOpen(false)}
+            showLogoutWhenSignedIn
+          >
             Get Started
-          </a>
+          </GetStartedButton>
         </div>
       )}
     </nav>

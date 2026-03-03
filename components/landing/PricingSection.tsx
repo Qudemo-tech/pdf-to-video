@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
+import { GetStartedButton } from '@/components/GetStartedButton';
 
 const plans = [
   {
@@ -81,8 +82,7 @@ export default function PricingSection() {
                   </li>
                 ))}
               </ul>
-              <a
-                href="#upload"
+              <GetStartedButton
                 className={`w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-center block ${
                   plan.highlight
                     ? 'btn-primary-glow !py-3 !text-sm'
@@ -90,7 +90,7 @@ export default function PricingSection() {
                 }`}
               >
                 {plan.cta}
-              </a>
+              </GetStartedButton>
             </motion.div>
           ))}
         </div>
