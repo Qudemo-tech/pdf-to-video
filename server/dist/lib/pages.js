@@ -12,19 +12,21 @@ const TEMP_PAGES_DIR = path_1.default.join(process.cwd(), 'public', 'temp-pages'
  * Convert each page of a PDF to a JPEG image.
  * Returns an array of relative URL paths like /temp-pages/page-1.jpg
  */
-async function convertPDFToImages(pdfBuffer) {
+async function convertPDFToImages(pdfBuffer, sessionId) {
+    // Use a per-request subdirectory to avoid cross-contamination between concurrent uploads
+    const sessionDir = path_1.default.join(TEMP_PAGES_DIR, sessionId);
     // Ensure output directory exists and is clean
-    if (fs_1.default.existsSync(TEMP_PAGES_DIR)) {
-        const existing = fs_1.default.readdirSync(TEMP_PAGES_DIR);
+    if (fs_1.default.existsSync(sessionDir)) {
+        const existing = fs_1.default.readdirSync(sessionDir);
         for (const file of existing) {
-            fs_1.default.unlinkSync(path_1.default.join(TEMP_PAGES_DIR, file));
+            fs_1.default.unlinkSync(path_1.default.join(sessionDir, file));
         }
     }
     else {
-        fs_1.default.mkdirSync(TEMP_PAGES_DIR, { recursive: true });
+        fs_1.default.mkdirSync(sessionDir, { recursive: true });
     }
     // Write PDF to a temp file (pdf2pic needs a file path)
-    const tempPdfPath = path_1.default.join(TEMP_PAGES_DIR, 'input.pdf');
+    const tempPdfPath = path_1.default.join(sessionDir, 'input.pdf');
     fs_1.default.writeFileSync(tempPdfPath, pdfBuffer);
     // Get page count using pdf-parse
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -34,7 +36,7 @@ async function convertPDFToImages(pdfBuffer) {
     const converter = (0, pdf2pic_1.fromPath)(tempPdfPath, {
         density: 150,
         saveFilename: 'page',
-        savePath: TEMP_PAGES_DIR,
+        savePath: sessionDir,
         format: 'jpg',
         width: 1920,
         height: 1080,
@@ -44,11 +46,11 @@ async function convertPDFToImages(pdfBuffer) {
         const result = await converter(i, { responseType: 'image' });
         if (result.path) {
             const newName = `page-${i}.jpg`;
-            const newPath = path_1.default.join(TEMP_PAGES_DIR, newName);
+            const newPath = path_1.default.join(sessionDir, newName);
             if (result.path !== newPath) {
                 fs_1.default.renameSync(result.path, newPath);
             }
-            imageUrls.push(`/temp-pages/${newName}`);
+            imageUrls.push(`/temp-pages/${sessionId}/${newName}`);
         }
     }
     // Clean up temp PDF

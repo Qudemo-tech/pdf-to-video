@@ -3,9 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const crypto_1 = require("crypto");
 const express_1 = require("express");
 const path_1 = __importDefault(require("path"));
 const pages_1 = require("../lib/pages");
+const gcs_1 = require("../lib/gcs");
 const router = (0, express_1.Router)();
 router.post('/', async (req, res) => {
     try {
@@ -19,7 +21,18 @@ router.post('/', async (req, res) => {
             return;
         }
         const buffer = file.buffer;
-        const imageUrls = await (0, pages_1.convertPDFToImages)(buffer);
+        const sessionId = (0, crypto_1.randomUUID)();
+        const imageUrls = await (0, pages_1.convertPDFToImages)(buffer, sessionId);
+        // Upload original PDF to GCS (non-fatal if it fails)
+        let pdfUrl = null;
+        console.log('[convert-pages] Attempting GCS PDF upload for session:', sessionId);
+        try {
+            pdfUrl = await (0, gcs_1.uploadBufferToGCS)(buffer, `pdfs/${sessionId}.pdf`, 'application/pdf');
+            console.log('[convert-pages] GCS PDF upload result:', pdfUrl);
+        }
+        catch (uploadErr) {
+            console.error('[convert-pages] GCS PDF upload failed (non-fatal):', uploadErr.message);
+        }
         // Build full public URLs using RENDER_EXTERNAL_URL
         const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 4000}`;
         const fullUrls = imageUrls.map((url) => `${baseUrl}${url}`);
@@ -30,6 +43,7 @@ router.post('/', async (req, res) => {
             imageUrls: fullUrls,
             localPaths,
             pageCount: imageUrls.length,
+            pdfUrl,
         });
     }
     catch (error) {
