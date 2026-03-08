@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import Navbar from '@/components/landing/Navbar';
 import HeroSection from '@/components/landing/HeroSection';
@@ -18,50 +19,22 @@ import ModeSelector from '@/components/ModeSelector';
 import PageByPageFlow from '@/components/PageByPageFlow';
 import { PipelineStep, VideoMode } from '@/types';
 import { API_BASE } from '@/lib/api';
-
-const SESSION_KEY = 'pdfSession';
-
-interface SessionData {
-  currentStep: PipelineStep;
-  selectedMode: VideoMode | null;
-  videoId: string;
-  hostedUrl: string;
-  extractedText: string;
-  pageCount: number;
-  characterCount: number;
-}
-
-function saveSession(data: SessionData) {
-  try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
-  } catch {
-    // sessionStorage may be unavailable
-  }
-}
-
-function loadSession(): SessionData | null {
-  try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    if (raw) return JSON.parse(raw) as SessionData;
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-function clearSession() {
-  try {
-    sessionStorage.removeItem(SESSION_KEY);
-    sessionStorage.removeItem('pbpSession');
-  } catch {
-    // ignore
-  }
-}
+import {
+  createSession,
+  getActiveSession,
+  updateSession,
+  deleteSession,
+  VideoSession,
+} from '@/lib/sessions';
 
 export default function Home() {
+  const { data: authSession } = useSession();
   const [currentStep, setCurrentStep] = useState<PipelineStep>('upload');
   const [selectedMode, setSelectedMode] = useState<VideoMode | null>(null);
   const [restored, setRestored] = useState(false);
+
+  // Database session ID
+  const [dbSessionId, setDbSessionId] = useState<string | null>(null);
 
   // PDF file reference (needed for page-by-page mode to re-upload for conversion)
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -79,36 +52,48 @@ export default function Home() {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
 
-  // Restore session on mount
-  useEffect(() => {
-    const saved = loadSession();
-    if (saved) {
-      // Summary mode: resume if video is in progress or done
-      if (saved.selectedMode === 'summary' && saved.currentStep === 'video' && saved.videoId) {
-        setCurrentStep('video');
-        setSelectedMode('summary');
-        setVideoId(saved.videoId);
-        setHostedUrl(saved.hostedUrl);
-        setExtractedText(saved.extractedText);
-        setPageCount(saved.pageCount);
-        setCharacterCount(saved.characterCount);
-      }
-      // Page-by-page mode: let PageByPageFlow handle its own restoration
-      else if (saved.selectedMode === 'page-by-page' && saved.currentStep === 'page-by-page') {
-        setCurrentStep('page-by-page');
-        setSelectedMode('page-by-page');
-        setExtractedText(saved.extractedText);
-        setPageCount(saved.pageCount);
-        setCharacterCount(saved.characterCount);
-        // pdfFile can't be restored, but PageByPageFlow will check pbpSession
-      }
-      // For other steps (upload, mode-select, script), just start fresh
-    }
-    setRestored(true);
-  }, []);
+  const restoredRef = useRef(false);
 
-  // Persist session whenever key state changes
-  const persistSession = useCallback((
+  // Restore session from Supabase on mount
+  useEffect(() => {
+    if (restoredRef.current) return;
+    if (!authSession?.user?.email) return;
+
+    restoredRef.current = true;
+
+    const restore = async () => {
+      const saved = await getActiveSession(authSession.user!.email!);
+      if (saved) {
+        setDbSessionId(saved.id);
+
+        // Summary mode: resume if video is in progress or done
+        if (saved.selected_mode === 'summary' && saved.current_step === 'video' && saved.video_id) {
+          setCurrentStep('video');
+          setSelectedMode('summary');
+          setVideoId(saved.video_id);
+          setHostedUrl(saved.hosted_url || '');
+          setExtractedText(saved.extracted_text || '');
+          setPageCount(saved.page_count);
+          setCharacterCount(saved.character_count);
+        }
+        // Page-by-page mode: let PageByPageFlow handle its own restoration
+        else if (saved.selected_mode === 'page-by-page' && saved.current_step === 'page-by-page') {
+          setCurrentStep('page-by-page');
+          setSelectedMode('page-by-page');
+          setExtractedText(saved.extracted_text || '');
+          setPageCount(saved.page_count);
+          setCharacterCount(saved.character_count);
+        }
+        // For other steps (upload, mode-select, script), start fresh
+      }
+      setRestored(true);
+    };
+
+    restore();
+  }, [authSession]);
+
+  // Persist session to Supabase
+  const persistSession = useCallback(async (
     step: PipelineStep,
     mode: VideoMode | null,
     vid: string,
@@ -116,23 +101,44 @@ export default function Home() {
     text: string,
     pages: number,
     chars: number,
+    pdfUrl?: string,
+    pbpData?: Record<string, unknown>,
   ) => {
-    saveSession({
-      currentStep: step,
-      selectedMode: mode,
-      videoId: vid,
-      hostedUrl: hosted,
-      extractedText: text,
-      pageCount: pages,
-      characterCount: chars,
+    if (!dbSessionId) return;
+    await updateSession(dbSessionId, {
+      current_step: step,
+      selected_mode: mode,
+      video_id: vid || null,
+      hosted_url: hosted || null,
+      extracted_text: text || null,
+      page_count: pages,
+      character_count: chars,
+      ...(pdfUrl !== undefined ? { pdf_url: pdfUrl } : {}),
+      ...(pbpData !== undefined ? { pbp_data: pbpData } : {}),
     });
-  }, []);
+  }, [dbSessionId]);
 
-  const handleTextExtracted = (text: string, pages: number, chars: number, file?: File) => {
+  const handleTextExtracted = async (text: string, pages: number, chars: number, file?: File, pdfUrl?: string) => {
     setExtractedText(text);
     setPageCount(pages);
     setCharacterCount(chars);
     if (file) setPdfFile(file);
+
+    // Create a new session in Supabase
+    if (authSession?.user?.email) {
+      const session = await createSession({
+        user_email: authSession.user.email,
+        user_name: authSession.user.name || undefined,
+        pdf_url: pdfUrl,
+        extracted_text: text,
+        page_count: pages,
+        character_count: chars,
+      });
+      if (session) {
+        setDbSessionId(session.id);
+      }
+    }
+
     setCurrentStep('mode-select');
   };
 
@@ -183,7 +189,12 @@ export default function Home() {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
+    // Mark session as completed in Supabase
+    if (dbSessionId) {
+      await updateSession(dbSessionId, { status: 'completed' });
+    }
+
     setCurrentStep('upload');
     setSelectedMode(null);
     setPdfFile(null);
@@ -193,7 +204,7 @@ export default function Home() {
     setVideoId('');
     setHostedUrl('');
     setVideoError(null);
-    clearSession();
+    setDbSessionId(null);
   };
 
   return (
@@ -290,6 +301,7 @@ export default function Home() {
                 extractedText={extractedText}
                 pageCount={pageCount}
                 onReset={handleReset}
+                dbSessionId={dbSessionId}
               />
             )}
           </motion.div>

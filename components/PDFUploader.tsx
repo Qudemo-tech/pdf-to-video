@@ -6,7 +6,7 @@ import { Upload, FileText } from 'lucide-react';
 import { API_BASE } from '@/lib/api';
 
 interface PDFUploaderProps {
-  onTextExtracted: (text: string, pageCount: number, characterCount: number, file?: File) => void;
+  onTextExtracted: (text: string, pageCount: number, characterCount: number, file?: File, pdfUrl?: string) => void;
 }
 
 export default function PDFUploader({ onTextExtracted }: PDFUploaderProps) {
@@ -86,7 +86,7 @@ export default function PDFUploader({ onTextExtracted }: PDFUploaderProps) {
         return;
       }
 
-      onTextExtracted(data.text, data.pageCount, data.characterCount, file);
+      onTextExtracted(data.text, data.pageCount, data.characterCount, file, data.pdfUrl);
     } catch {
       setError('Failed to upload and extract text. Please try again.');
     } finally {

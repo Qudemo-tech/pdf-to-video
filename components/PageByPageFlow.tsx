@@ -5,8 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, AlertCircle, Download, RotateCcw, ChevronRight } from 'lucide-react';
 import { PageByPageStep, PageScript, PageVideo } from '@/types';
 import { API_BASE } from '@/lib/api';
-
-const PBP_SESSION_KEY = 'pbpSession';
+import { updateSession, getSessionById } from '@/lib/sessions';
 
 interface PbpSessionData {
   step: PageByPageStep;
@@ -18,31 +17,12 @@ interface PbpSessionData {
   outputVideoUrl: string | null;
 }
 
-function savePbpSession(data: PbpSessionData) {
-  try {
-    sessionStorage.setItem(PBP_SESSION_KEY, JSON.stringify(data));
-  } catch { /* ignore */ }
-}
-
-function loadPbpSession(): PbpSessionData | null {
-  try {
-    const raw = sessionStorage.getItem(PBP_SESSION_KEY);
-    if (raw) return JSON.parse(raw) as PbpSessionData;
-  } catch { /* ignore */ }
-  return null;
-}
-
-function clearPbpSession() {
-  try {
-    sessionStorage.removeItem(PBP_SESSION_KEY);
-  } catch { /* ignore */ }
-}
-
 interface PageByPageFlowProps {
   pdfFile: File | null;
   extractedText: string;
   pageCount: number;
   onReset: () => void;
+  dbSessionId: string | null;
 }
 
 const STEP_LABELS: Record<PageByPageStep, string> = {
@@ -67,6 +47,7 @@ export default function PageByPageFlow({
   extractedText,
   pageCount,
   onReset,
+  dbSessionId,
 }: PageByPageFlowProps) {
   const [step, setStep] = useState<PageByPageStep>('converting-pages');
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +59,16 @@ export default function PageByPageFlow({
   const [totalVideos, setTotalVideos] = useState(0);
   const [outputVideoUrl, setOutputVideoUrl] = useState<string | null>(null);
   const startedRef = useRef(false);
+
+  // Save page-by-page state to Supabase
+  const savePbpToDb = useCallback(async (data: PbpSessionData) => {
+    if (!dbSessionId) return;
+    await updateSession(dbSessionId, {
+      current_step: 'page-by-page',
+      pbp_data: data as unknown as Record<string, unknown>,
+      ...(data.step === 'done' ? { status: 'completed' } : {}),
+    });
+  }, [dbSessionId]);
 
   // Poll video statuses
   const pollVideos = useCallback(async (videos: PageVideo[]): Promise<PageVideo[]> => {
@@ -166,7 +157,7 @@ export default function PageByPageFlow({
     setPageVideos(readyVideos);
 
     // Save progress before stitching
-    savePbpSession({
+    await savePbpToDb({
       step: 'stitching',
       imageUrls,
       localPaths: savedLocalPaths,
@@ -181,7 +172,7 @@ export default function PageByPageFlow({
     setOutputVideoUrl(outputUrl);
     setStep('done');
 
-    savePbpSession({
+    await savePbpToDb({
       step: 'done',
       imageUrls,
       localPaths: savedLocalPaths,
@@ -190,69 +181,84 @@ export default function PageByPageFlow({
       totalVideos: readyVideos.length,
       outputVideoUrl: outputUrl,
     });
-  }, [pollVideos, stitchVideos, imageUrls, scripts]);
+  }, [pollVideos, stitchVideos, savePbpToDb, imageUrls, scripts]);
 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    // Check for saved session to resume
-    const saved = loadPbpSession();
+    // Try to restore from Supabase
+    const restoreAndRun = async () => {
+      let saved: PbpSessionData | null = null;
 
-    if (saved) {
-      // If done, show the final video immediately
-      if (saved.step === 'done' && saved.outputVideoUrl) {
-        setStep('done');
-        setOutputVideoUrl(saved.outputVideoUrl);
-        setImageUrls(saved.imageUrls);
-        setLocalPaths(saved.localPaths);
-        setScripts(saved.scripts);
-        setPageVideos(saved.pageVideos);
-        setTotalVideos(saved.totalVideos);
-        setVideosReady(saved.totalVideos);
-        return;
+      // Load saved pbp_data from Supabase
+      if (dbSessionId) {
+        try {
+          const session = await getSessionById(dbSessionId);
+          if (session?.pbp_data) {
+            saved = session.pbp_data as unknown as PbpSessionData;
+          }
+        } catch { /* ignore */ }
       }
 
-      // If videos were submitted, resume polling + stitching
-      if (
-        (saved.step === 'generating-videos' || saved.step === 'stitching') &&
-        saved.pageVideos.length > 0
-      ) {
-        setImageUrls(saved.imageUrls);
-        setLocalPaths(saved.localPaths);
-        setScripts(saved.scripts);
+      if (saved) {
+        // If done, show the final video immediately
+        if (saved.step === 'done' && saved.outputVideoUrl) {
+          setStep('done');
+          setOutputVideoUrl(saved.outputVideoUrl);
+          setImageUrls(saved.imageUrls);
+          setLocalPaths(saved.localPaths);
+          setScripts(saved.scripts);
+          setPageVideos(saved.pageVideos);
+          setTotalVideos(saved.totalVideos);
+          setVideosReady(saved.totalVideos);
+          return;
+        }
 
-        resumeFromVideos(saved.pageVideos, saved.localPaths).catch((err) => {
-          console.error('Page-by-page resume error:', err);
-          const msg = err instanceof Error ? err.message : 'An unexpected error occurred';
-          setError(msg.replace(/tavus/gi, 'video service'));
+        // If videos were submitted, resume polling + stitching
+        if (
+          (saved.step === 'generating-videos' || saved.step === 'stitching') &&
+          saved.pageVideos.length > 0
+        ) {
+          setImageUrls(saved.imageUrls);
+          setLocalPaths(saved.localPaths);
+          setScripts(saved.scripts);
+
+          try {
+            await resumeFromVideos(saved.pageVideos, saved.localPaths);
+          } catch (err) {
+            console.error('Page-by-page resume error:', err);
+            const msg = err instanceof Error ? err.message : 'An unexpected error occurred';
+            setError(msg.replace(/tavus/gi, 'video service'));
+            setStep('error');
+          }
+          return;
+        }
+
+        // For earlier steps, we need the PDF file which can't be restored
+        if (!pdfFile) {
+          setError('Your session was interrupted during an early step. Please start over.');
           setStep('error');
-        });
-        return;
+          return;
+        }
       }
 
-      // For earlier steps (converting-pages, generating-scripts), we need the File
-      // which can't be restored. If we don't have it, show an error.
+      // No saved session or can't resume — need pdfFile to start fresh
       if (!pdfFile) {
-        setError('Your session was interrupted during an early step. Please start over.');
+        setError('No PDF file available. Please start over.');
         setStep('error');
         return;
       }
-    }
 
-    // No saved session or can't resume — need pdfFile to start fresh
-    if (!pdfFile) {
-      setError('No PDF file available. Please start over.');
-      setStep('error');
-      return;
-    }
+      await runFreshPipeline();
+    };
 
-    const run = async () => {
+    const runFreshPipeline = async () => {
       try {
         // Step 1: Convert pages to images
         setStep('converting-pages');
         const formData = new FormData();
-        formData.append('file', pdfFile);
+        formData.append('file', pdfFile!);
 
         const convertRes = await fetch(`${API_BASE}/api/convert-pages`, {
           method: 'POST',
@@ -323,7 +329,7 @@ export default function PageByPageFlow({
         setPageVideos(videos);
 
         // Save session so refresh can resume from here
-        savePbpSession({
+        await savePbpToDb({
           step: 'generating-videos',
           imageUrls: convertData.imageUrls,
           localPaths: convertData.localPaths || [],
@@ -338,7 +344,7 @@ export default function PageByPageFlow({
         setPageVideos(readyVideos);
 
         // Step 4: Stitch videos
-        savePbpSession({
+        await savePbpToDb({
           step: 'stitching',
           imageUrls: convertData.imageUrls,
           localPaths: convertData.localPaths || [],
@@ -354,7 +360,7 @@ export default function PageByPageFlow({
         setStep('done');
 
         // Save final state
-        savePbpSession({
+        await savePbpToDb({
           step: 'done',
           imageUrls: convertData.imageUrls,
           localPaths: convertData.localPaths || [],
@@ -371,8 +377,8 @@ export default function PageByPageFlow({
       }
     };
 
-    run();
-  }, [pdfFile, extractedText, pageCount, pollVideos, stitchVideos, resumeFromVideos]);
+    restoreAndRun();
+  }, [pdfFile, extractedText, pageCount, pollVideos, stitchVideos, resumeFromVideos, savePbpToDb, dbSessionId]);
 
   const currentStepIndex = STEPS_ORDER.indexOf(step);
 
@@ -521,10 +527,7 @@ export default function PageByPageFlow({
       {/* Start Over */}
       <div className="pt-4 border-t border-white/[0.08]">
         <button
-          onClick={() => {
-            clearPbpSession();
-            onReset();
-          }}
+          onClick={onReset}
           className="btn-ghost-outline w-full flex items-center justify-center gap-2"
         >
           <RotateCcw className="w-4 h-4" />
