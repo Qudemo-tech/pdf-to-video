@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import Navbar from '@/components/landing/Navbar';
 import HeroSection from '@/components/landing/HeroSection';
@@ -19,9 +19,49 @@ import PageByPageFlow from '@/components/PageByPageFlow';
 import { PipelineStep, VideoMode } from '@/types';
 import { API_BASE } from '@/lib/api';
 
+const SESSION_KEY = 'pdfSession';
+
+interface SessionData {
+  currentStep: PipelineStep;
+  selectedMode: VideoMode | null;
+  videoId: string;
+  hostedUrl: string;
+  extractedText: string;
+  pageCount: number;
+  characterCount: number;
+}
+
+function saveSession(data: SessionData) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
+  } catch {
+    // sessionStorage may be unavailable
+  }
+}
+
+function loadSession(): SessionData | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (raw) return JSON.parse(raw) as SessionData;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function clearSession() {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem('pbpSession');
+  } catch {
+    // ignore
+  }
+}
+
 export default function Home() {
   const [currentStep, setCurrentStep] = useState<PipelineStep>('upload');
   const [selectedMode, setSelectedMode] = useState<VideoMode | null>(null);
+  const [restored, setRestored] = useState(false);
 
   // PDF file reference (needed for page-by-page mode to re-upload for conversion)
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -39,6 +79,55 @@ export default function Home() {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
 
+  // Restore session on mount
+  useEffect(() => {
+    const saved = loadSession();
+    if (saved) {
+      // Summary mode: resume if video is in progress or done
+      if (saved.selectedMode === 'summary' && saved.currentStep === 'video' && saved.videoId) {
+        setCurrentStep('video');
+        setSelectedMode('summary');
+        setVideoId(saved.videoId);
+        setHostedUrl(saved.hostedUrl);
+        setExtractedText(saved.extractedText);
+        setPageCount(saved.pageCount);
+        setCharacterCount(saved.characterCount);
+      }
+      // Page-by-page mode: let PageByPageFlow handle its own restoration
+      else if (saved.selectedMode === 'page-by-page' && saved.currentStep === 'page-by-page') {
+        setCurrentStep('page-by-page');
+        setSelectedMode('page-by-page');
+        setExtractedText(saved.extractedText);
+        setPageCount(saved.pageCount);
+        setCharacterCount(saved.characterCount);
+        // pdfFile can't be restored, but PageByPageFlow will check pbpSession
+      }
+      // For other steps (upload, mode-select, script), just start fresh
+    }
+    setRestored(true);
+  }, []);
+
+  // Persist session whenever key state changes
+  const persistSession = useCallback((
+    step: PipelineStep,
+    mode: VideoMode | null,
+    vid: string,
+    hosted: string,
+    text: string,
+    pages: number,
+    chars: number,
+  ) => {
+    saveSession({
+      currentStep: step,
+      selectedMode: mode,
+      videoId: vid,
+      hostedUrl: hosted,
+      extractedText: text,
+      pageCount: pages,
+      characterCount: chars,
+    });
+  }, []);
+
   const handleTextExtracted = (text: string, pages: number, chars: number, file?: File) => {
     setExtractedText(text);
     setPageCount(pages);
@@ -51,8 +140,10 @@ export default function Home() {
     setSelectedMode(mode);
     if (mode === 'summary') {
       setCurrentStep('script');
+      persistSession('script', 'summary', '', '', extractedText, pageCount, characterCount);
     } else {
       setCurrentStep('page-by-page');
+      persistSession('page-by-page', 'page-by-page', '', '', extractedText, pageCount, characterCount);
     }
   };
 
@@ -82,6 +173,8 @@ export default function Home() {
 
       setVideoId(data.videoId);
       setHostedUrl(data.hostedUrl);
+      // Save session so refresh can resume polling
+      persistSession('video', 'summary', data.videoId, data.hostedUrl, extractedText, pageCount, characterCount);
     } catch {
       setVideoError('Failed to start video generation. Please try again.');
       setCurrentStep('script');
@@ -100,6 +193,7 @@ export default function Home() {
     setVideoId('');
     setHostedUrl('');
     setVideoError(null);
+    clearSession();
   };
 
   return (
@@ -190,7 +284,7 @@ export default function Home() {
             )}
 
             {/* Page-by-Page Mode */}
-            {currentStep === 'page-by-page' && pdfFile && (
+            {currentStep === 'page-by-page' && (
               <PageByPageFlow
                 pdfFile={pdfFile}
                 extractedText={extractedText}

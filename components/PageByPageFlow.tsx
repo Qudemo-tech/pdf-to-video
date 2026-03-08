@@ -6,8 +6,40 @@ import { Check, AlertCircle, Download, RotateCcw, ChevronRight } from 'lucide-re
 import { PageByPageStep, PageScript, PageVideo } from '@/types';
 import { API_BASE } from '@/lib/api';
 
+const PBP_SESSION_KEY = 'pbpSession';
+
+interface PbpSessionData {
+  step: PageByPageStep;
+  imageUrls: string[];
+  localPaths: string[];
+  scripts: PageScript[];
+  pageVideos: PageVideo[];
+  totalVideos: number;
+  outputVideoUrl: string | null;
+}
+
+function savePbpSession(data: PbpSessionData) {
+  try {
+    sessionStorage.setItem(PBP_SESSION_KEY, JSON.stringify(data));
+  } catch { /* ignore */ }
+}
+
+function loadPbpSession(): PbpSessionData | null {
+  try {
+    const raw = sessionStorage.getItem(PBP_SESSION_KEY);
+    if (raw) return JSON.parse(raw) as PbpSessionData;
+  } catch { /* ignore */ }
+  return null;
+}
+
+function clearPbpSession() {
+  try {
+    sessionStorage.removeItem(PBP_SESSION_KEY);
+  } catch { /* ignore */ }
+}
+
 interface PageByPageFlowProps {
-  pdfFile: File;
+  pdfFile: File | null;
   extractedText: string;
   pageCount: number;
   onReset: () => void;
@@ -94,9 +126,126 @@ export default function PageByPageFlow({
     return updated;
   }, []);
 
+  // Stitch videos into final output
+  const stitchVideos = useCallback(async (readyVideos: PageVideo[], savedLocalPaths: string[]) => {
+    setStep('stitching');
+
+    const orderedVideos = readyVideos.sort((a, b) => a.pageNumber - b.pageNumber);
+    const downloadUrls = orderedVideos
+      .map((v) => v.downloadUrl)
+      .filter((url): url is string => !!url);
+
+    if (downloadUrls.length === 0) {
+      throw new Error('No download URLs available for stitching');
+    }
+
+    const stitchRes = await fetch(`${API_BASE}/api/stitch-videos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        videoUrls: downloadUrls,
+        imageUrls: savedLocalPaths,
+      }),
+    });
+    const stitchData = await stitchRes.json();
+
+    if (!stitchData.success) {
+      throw new Error(stitchData.error || 'Failed to stitch videos');
+    }
+
+    return stitchData.outputUrl as string;
+  }, []);
+
+  // Resume from generating-videos step (poll + stitch)
+  const resumeFromVideos = useCallback(async (videos: PageVideo[], savedLocalPaths: string[]) => {
+    setStep('generating-videos');
+    setPageVideos(videos);
+    setTotalVideos(videos.length);
+
+    const readyVideos = await pollVideos(videos);
+    setPageVideos(readyVideos);
+
+    // Save progress before stitching
+    savePbpSession({
+      step: 'stitching',
+      imageUrls,
+      localPaths: savedLocalPaths,
+      scripts,
+      pageVideos: readyVideos,
+      totalVideos: readyVideos.length,
+      outputVideoUrl: null,
+    });
+
+    const outputUrl = await stitchVideos(readyVideos, savedLocalPaths);
+
+    setOutputVideoUrl(outputUrl);
+    setStep('done');
+
+    savePbpSession({
+      step: 'done',
+      imageUrls,
+      localPaths: savedLocalPaths,
+      scripts,
+      pageVideos: readyVideos,
+      totalVideos: readyVideos.length,
+      outputVideoUrl: outputUrl,
+    });
+  }, [pollVideos, stitchVideos, imageUrls, scripts]);
+
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
+
+    // Check for saved session to resume
+    const saved = loadPbpSession();
+
+    if (saved) {
+      // If done, show the final video immediately
+      if (saved.step === 'done' && saved.outputVideoUrl) {
+        setStep('done');
+        setOutputVideoUrl(saved.outputVideoUrl);
+        setImageUrls(saved.imageUrls);
+        setLocalPaths(saved.localPaths);
+        setScripts(saved.scripts);
+        setPageVideos(saved.pageVideos);
+        setTotalVideos(saved.totalVideos);
+        setVideosReady(saved.totalVideos);
+        return;
+      }
+
+      // If videos were submitted, resume polling + stitching
+      if (
+        (saved.step === 'generating-videos' || saved.step === 'stitching') &&
+        saved.pageVideos.length > 0
+      ) {
+        setImageUrls(saved.imageUrls);
+        setLocalPaths(saved.localPaths);
+        setScripts(saved.scripts);
+
+        resumeFromVideos(saved.pageVideos, saved.localPaths).catch((err) => {
+          console.error('Page-by-page resume error:', err);
+          const msg = err instanceof Error ? err.message : 'An unexpected error occurred';
+          setError(msg.replace(/tavus/gi, 'video service'));
+          setStep('error');
+        });
+        return;
+      }
+
+      // For earlier steps (converting-pages, generating-scripts), we need the File
+      // which can't be restored. If we don't have it, show an error.
+      if (!pdfFile) {
+        setError('Your session was interrupted during an early step. Please start over.');
+        setStep('error');
+        return;
+      }
+    }
+
+    // No saved session or can't resume — need pdfFile to start fresh
+    if (!pdfFile) {
+      setError('No PDF file available. Please start over.');
+      setStep('error');
+      return;
+    }
 
     const run = async () => {
       try {
@@ -136,7 +285,7 @@ export default function PageByPageFlow({
         }
         setScripts(scriptsData.scripts);
 
-        // Step 3: Generate videos via Tavus
+        // Step 3: Generate videos
         setStep('generating-videos');
         const allScripts: PageScript[] = scriptsData.scripts;
         const numVideos = allScripts.length;
@@ -145,7 +294,6 @@ export default function PageByPageFlow({
         const videos: PageVideo[] = [];
 
         for (const scriptItem of allScripts) {
-          // No background sent to Tavus — PiP compositing happens during stitch
           const payload: Record<string, string> = {
             script: scriptItem.script,
             videoName: scriptItem.pageNumber === 0
@@ -174,39 +322,47 @@ export default function PageByPageFlow({
 
         setPageVideos(videos);
 
+        // Save session so refresh can resume from here
+        savePbpSession({
+          step: 'generating-videos',
+          imageUrls: convertData.imageUrls,
+          localPaths: convertData.localPaths || [],
+          scripts: scriptsData.scripts,
+          pageVideos: videos,
+          totalVideos: numVideos,
+          outputVideoUrl: null,
+        });
+
         // Poll until all ready
         const readyVideos = await pollVideos(videos);
         setPageVideos(readyVideos);
 
         // Step 4: Stitch videos
-        setStep('stitching');
-
-        // Collect download URLs in order (intro first, then pages)
-        const orderedVideos = readyVideos.sort((a, b) => a.pageNumber - b.pageNumber);
-        const downloadUrls = orderedVideos
-          .map((v) => v.downloadUrl)
-          .filter((url): url is string => !!url);
-
-        if (downloadUrls.length === 0) {
-          throw new Error('No download URLs available for stitching');
-        }
-
-        const stitchRes = await fetch(`${API_BASE}/api/stitch-videos`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            videoUrls: downloadUrls,
-            imageUrls: convertData.localPaths || [],
-          }),
+        savePbpSession({
+          step: 'stitching',
+          imageUrls: convertData.imageUrls,
+          localPaths: convertData.localPaths || [],
+          scripts: scriptsData.scripts,
+          pageVideos: readyVideos,
+          totalVideos: numVideos,
+          outputVideoUrl: null,
         });
-        const stitchData = await stitchRes.json();
 
-        if (!stitchData.success) {
-          throw new Error(stitchData.error || 'Failed to stitch videos');
-        }
+        const outputUrl = await stitchVideos(readyVideos, convertData.localPaths || []);
 
-        setOutputVideoUrl(stitchData.outputUrl);
+        setOutputVideoUrl(outputUrl);
         setStep('done');
+
+        // Save final state
+        savePbpSession({
+          step: 'done',
+          imageUrls: convertData.imageUrls,
+          localPaths: convertData.localPaths || [],
+          scripts: scriptsData.scripts,
+          pageVideos: readyVideos,
+          totalVideos: numVideos,
+          outputVideoUrl: outputUrl,
+        });
       } catch (err) {
         console.error('Page-by-page flow error:', err);
         const msg = err instanceof Error ? err.message : 'An unexpected error occurred';
@@ -216,7 +372,7 @@ export default function PageByPageFlow({
     };
 
     run();
-  }, [pdfFile, extractedText, pageCount, pollVideos]);
+  }, [pdfFile, extractedText, pageCount, pollVideos, stitchVideos, resumeFromVideos]);
 
   const currentStepIndex = STEPS_ORDER.indexOf(step);
 
@@ -365,7 +521,10 @@ export default function PageByPageFlow({
       {/* Start Over */}
       <div className="pt-4 border-t border-white/[0.08]">
         <button
-          onClick={onReset}
+          onClick={() => {
+            clearPbpSession();
+            onReset();
+          }}
           className="btn-ghost-outline w-full flex items-center justify-center gap-2"
         >
           <RotateCcw className="w-4 h-4" />
