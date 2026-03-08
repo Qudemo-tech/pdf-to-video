@@ -209,7 +209,8 @@ export default function PageByPageFlow({
         setStep('done');
       } catch (err) {
         console.error('Page-by-page flow error:', err);
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+        const msg = err instanceof Error ? err.message : 'An unexpected error occurred';
+        setError(msg.replace(/tavus/gi, 'video service'));
         setStep('error');
       }
     };

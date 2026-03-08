@@ -22,6 +22,10 @@ export default function VideoPlayer({ videoId, initialHostedUrl, onReset }: Vide
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const sanitizeError = (msg: string): string => {
+    return msg.replace(/tavus/gi, 'video service');
+  };
+
   const pollStatus = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/api/video-status?videoId=${videoId}`);
@@ -36,7 +40,7 @@ export default function VideoPlayer({ videoId, initialHostedUrl, onReset }: Vide
           if (pollRef.current) clearInterval(pollRef.current);
           if (timerRef.current) clearInterval(timerRef.current);
           if (data.status === 'error') {
-            setErrorMessage(data.errorMessage || 'Video generation failed');
+            setErrorMessage(sanitizeError(data.errorMessage || 'Video generation failed'));
           }
         }
       }
@@ -177,11 +181,10 @@ export default function VideoPlayer({ videoId, initialHostedUrl, onReset }: Vide
 
           <div className="glass-card overflow-hidden glow-border">
             <div className="aspect-video bg-card">
-              <iframe
-                src={hostedUrl}
-                className="w-full h-full"
-                allowFullScreen
-                allow="autoplay; encrypted-media"
+              <video
+                src={downloadUrl || hostedUrl}
+                controls
+                className="w-full h-full object-cover"
               />
             </div>
           </div>

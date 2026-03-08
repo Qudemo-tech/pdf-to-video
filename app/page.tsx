@@ -74,7 +74,8 @@ export default function Home() {
       const data = await response.json();
 
       if (!data.success) {
-        setVideoError(data.error || 'Failed to generate video');
+        const errMsg = (data.error || 'Failed to generate video').replace(/tavus/gi, 'video service');
+        setVideoError(errMsg);
         setCurrentStep('script');
         return;
       }
