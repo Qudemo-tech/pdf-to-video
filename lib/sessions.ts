@@ -25,6 +25,7 @@ export async function createSession(params: {
   extracted_text?: string;
   page_count?: number;
   character_count?: number;
+  pbp_data?: Record<string, unknown>;
 }): Promise<VideoSession | null> {
   try {
     const res = await fetch(`${API_BASE}/api/sessions`, {

@@ -23,6 +23,7 @@ interface PageByPageFlowProps {
   pageCount: number;
   onReset: () => void;
   dbSessionId: string | null;
+  downloadFileName?: string;
 }
 
 const STEP_LABELS: Record<PageByPageStep, string> = {
@@ -48,6 +49,7 @@ export default function PageByPageFlow({
   pageCount,
   onReset,
   dbSessionId,
+  downloadFileName,
 }: PageByPageFlowProps) {
   const [step, setStep] = useState<PageByPageStep>('converting-pages');
   const [error, setError] = useState<string | null>(null);
@@ -520,7 +522,7 @@ export default function PageByPageFlow({
 
           <a
             href={outputVideoUrl}
-            download
+            download={downloadFileName || true}
             className="btn-primary-glow w-full flex items-center justify-center gap-2 text-center"
           >
             <Download className="w-5 h-5" />

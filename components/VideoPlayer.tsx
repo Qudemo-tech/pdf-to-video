@@ -12,9 +12,10 @@ interface VideoPlayerProps {
   initialHostedUrl: string;
   onReset: () => void;
   dbSessionId: string | null;
+  downloadFileName?: string;
 }
 
-export default function VideoPlayer({ videoId, initialHostedUrl, onReset, dbSessionId }: VideoPlayerProps) {
+export default function VideoPlayer({ videoId, initialHostedUrl, onReset, dbSessionId, downloadFileName }: VideoPlayerProps) {
   const [status, setStatus] = useState<VideoStatus>('queued');
   const [hostedUrl, setHostedUrl] = useState(initialHostedUrl);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -207,6 +208,7 @@ export default function VideoPlayer({ videoId, initialHostedUrl, onReset, dbSess
             {downloadUrl && (
               <a
                 href={downloadUrl}
+                download={downloadFileName || true}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-primary-glow flex-1 flex items-center justify-center gap-2 text-center"

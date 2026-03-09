@@ -38,6 +38,7 @@ export default function Home() {
 
   // PDF file reference (needed for page-by-page mode to re-upload for conversion)
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfFileName, setPdfFileName] = useState<string>('');
 
   // Step 1 → 2 data
   const [extractedText, setExtractedText] = useState('');
@@ -65,6 +66,11 @@ export default function Home() {
       const saved = await getActiveSession(authSession.user!.email!);
       if (saved) {
         setDbSessionId(saved.id);
+
+        // Restore PDF filename from pbp_data metadata
+        if (saved.pbp_data && typeof saved.pbp_data === 'object' && 'pdfFileName' in saved.pbp_data) {
+          setPdfFileName(saved.pbp_data.pdfFileName as string);
+        }
 
         // Summary mode: resume if video is in progress or done
         if (saved.selected_mode === 'summary' && saved.current_step === 'video' && saved.video_id) {
@@ -122,9 +128,13 @@ export default function Home() {
     setExtractedText(text);
     setPageCount(pages);
     setCharacterCount(chars);
-    if (file) setPdfFile(file);
+    if (file) {
+      setPdfFile(file);
+      setPdfFileName(file.name.replace(/\.pdf$/i, ''));
+    }
 
     // Create a new session in Supabase
+    const fileName = file ? file.name.replace(/\.pdf$/i, '') : '';
     if (authSession?.user?.email) {
       const session = await createSession({
         user_email: authSession.user.email,
@@ -133,6 +143,7 @@ export default function Home() {
         extracted_text: text,
         page_count: pages,
         character_count: chars,
+        pbp_data: { pdfFileName: fileName },
       });
       if (session) {
         setDbSessionId(session.id);
@@ -198,6 +209,7 @@ export default function Home() {
     setCurrentStep('upload');
     setSelectedMode(null);
     setPdfFile(null);
+    setPdfFileName('');
     setExtractedText('');
     setPageCount(0);
     setCharacterCount(0);
@@ -291,6 +303,7 @@ export default function Home() {
                   initialHostedUrl={hostedUrl}
                   onReset={handleReset}
                   dbSessionId={dbSessionId}
+                  downloadFileName={pdfFileName ? `${pdfFileName}.mp4` : undefined}
                 />
               </div>
             )}
@@ -303,6 +316,7 @@ export default function Home() {
                 pageCount={pageCount}
                 onReset={handleReset}
                 dbSessionId={dbSessionId}
+                downloadFileName={pdfFileName ? `${pdfFileName}.mp4` : undefined}
               />
             )}
           </motion.div>
