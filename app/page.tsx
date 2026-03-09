@@ -290,6 +290,7 @@ export default function Home() {
                   videoId={videoId}
                   initialHostedUrl={hostedUrl}
                   onReset={handleReset}
+                  dbSessionId={dbSessionId}
                 />
               </div>
             )}

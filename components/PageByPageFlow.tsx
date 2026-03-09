@@ -144,8 +144,13 @@ export default function PageByPageFlow({
       throw new Error(stitchData.error || 'Failed to stitch videos');
     }
 
+    // Save GCS URL to Supabase hosted_url
+    if (dbSessionId && stitchData.gcsUrl) {
+      await updateSession(dbSessionId, { hosted_url: stitchData.gcsUrl });
+    }
+
     return stitchData.outputUrl as string;
-  }, []);
+  }, [dbSessionId]);
 
   // Resume from generating-videos step (poll + stitch)
   const resumeFromVideos = useCallback(async (videos: PageVideo[], savedLocalPaths: string[]) => {

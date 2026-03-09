@@ -5,14 +5,16 @@ import { motion } from 'framer-motion';
 import { Download, Copy, Check, AlertCircle, RefreshCw, RotateCcw } from 'lucide-react';
 import { VideoStatus } from '@/types';
 import { API_BASE } from '@/lib/api';
+import { updateSession } from '@/lib/sessions';
 
 interface VideoPlayerProps {
   videoId: string;
   initialHostedUrl: string;
   onReset: () => void;
+  dbSessionId: string | null;
 }
 
-export default function VideoPlayer({ videoId, initialHostedUrl, onReset }: VideoPlayerProps) {
+export default function VideoPlayer({ videoId, initialHostedUrl, onReset, dbSessionId }: VideoPlayerProps) {
   const [status, setStatus] = useState<VideoStatus>('queued');
   const [hostedUrl, setHostedUrl] = useState(initialHostedUrl);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -41,42 +43,26 @@ export default function VideoPlayer({ videoId, initialHostedUrl, onReset }: Vide
           if (timerRef.current) clearInterval(timerRef.current);
           if (data.status === 'error') {
             setErrorMessage(sanitizeError(data.errorMessage || 'Video generation failed'));
+            // Mark session as failed
+            if (dbSessionId) {
+              updateSession(dbSessionId, { status: 'failed' });
+            }
           }
-          // Persist ready/error state so refresh shows result immediately
-          if (data.status === 'ready') {
-            try {
-              const raw = sessionStorage.getItem('pdfSession');
-              if (raw) {
-                const session = JSON.parse(raw);
-                session.videoStatus = 'ready';
-                session.downloadUrl = data.downloadUrl || '';
-                session.hostedUrl = data.hostedUrl || session.hostedUrl;
-                sessionStorage.setItem('pdfSession', JSON.stringify(session));
-              }
-            } catch { /* ignore */ }
+          // Save GCS URL and mark completed in Supabase
+          if (data.status === 'ready' && dbSessionId) {
+            updateSession(dbSessionId, {
+              hosted_url: data.gcsUrl || data.hostedUrl || null,
+              status: 'completed',
+            });
           }
         }
       }
     } catch {
       // Silently retry on next poll
     }
-  }, [videoId]);
+  }, [videoId, dbSessionId]);
 
   useEffect(() => {
-    // Check if video is already ready from a previous session
-    try {
-      const raw = sessionStorage.getItem('pdfSession');
-      if (raw) {
-        const session = JSON.parse(raw);
-        if (session.videoStatus === 'ready' && session.downloadUrl) {
-          setStatus('ready');
-          setDownloadUrl(session.downloadUrl);
-          if (session.hostedUrl) setHostedUrl(session.hostedUrl);
-          return; // No need to poll
-        }
-      }
-    } catch { /* ignore */ }
-
     // Start polling every 10 seconds
     pollStatus();
     pollRef.current = setInterval(pollStatus, 10000);
