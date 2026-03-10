@@ -6,6 +6,7 @@ import { Check, AlertCircle, Download, RotateCcw, ChevronRight } from 'lucide-re
 import { PageByPageStep, PageScript, PageVideo } from '@/types';
 import { API_BASE } from '@/lib/api';
 import { updateSession, getSessionById } from '@/lib/sessions';
+import { downloadWithFilename } from '@/lib/download';
 
 interface PbpSessionData {
   step: PageByPageStep;
@@ -520,14 +521,13 @@ export default function PageByPageFlow({
             </div>
           </div>
 
-          <a
-            href={outputVideoUrl}
-            download={downloadFileName || true}
+          <button
+            onClick={() => downloadWithFilename(outputVideoUrl, downloadFileName || 'video.mp4')}
             className="btn-primary-glow w-full flex items-center justify-center gap-2 text-center"
           >
             <Download className="w-5 h-5" />
             Download Video
-          </a>
+          </button>
         </motion.div>
       )}
 

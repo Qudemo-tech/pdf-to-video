@@ -6,6 +6,7 @@ import { Download, Copy, Check, AlertCircle, RefreshCw, RotateCcw } from 'lucide
 import { VideoStatus } from '@/types';
 import { API_BASE } from '@/lib/api';
 import { updateSession } from '@/lib/sessions';
+import { downloadWithFilename } from '@/lib/download';
 
 interface VideoPlayerProps {
   videoId: string;
@@ -206,16 +207,13 @@ export default function VideoPlayer({ videoId, initialHostedUrl, onReset, dbSess
           {/* Action Buttons */}
           <div className="flex gap-3">
             {downloadUrl && (
-              <a
-                href={downloadUrl}
-                download={downloadFileName || true}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => downloadWithFilename(downloadUrl, downloadFileName || 'video.mp4')}
                 className="btn-primary-glow flex-1 flex items-center justify-center gap-2 text-center"
               >
                 <Download className="w-5 h-5" />
                 Download
-              </a>
+              </button>
             )}
             <button
               onClick={handleCopyLink}
