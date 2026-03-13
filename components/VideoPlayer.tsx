@@ -14,9 +14,11 @@ interface VideoPlayerProps {
   onReset: () => void;
   dbSessionId: string | null;
   downloadFileName?: string;
+  userEmail?: string;
+  userName?: string;
 }
 
-export default function VideoPlayer({ videoId, initialHostedUrl, onReset, dbSessionId, downloadFileName }: VideoPlayerProps) {
+export default function VideoPlayer({ videoId, initialHostedUrl, onReset, dbSessionId, downloadFileName, userEmail, userName }: VideoPlayerProps) {
   const [status, setStatus] = useState<VideoStatus>('queued');
   const [hostedUrl, setHostedUrl] = useState(initialHostedUrl);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -25,6 +27,14 @@ export default function VideoPlayer({ videoId, initialHostedUrl, onReset, dbSess
   const [copied, setCopied] = useState(false);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const userEmailRef = useRef(userEmail);
+  const userNameRef = useRef(userName);
+  const dbSessionIdRef = useRef(dbSessionId);
+
+  // Keep refs in sync with latest prop values
+  useEffect(() => { userEmailRef.current = userEmail; }, [userEmail]);
+  useEffect(() => { userNameRef.current = userName; }, [userName]);
+  useEffect(() => { dbSessionIdRef.current = dbSessionId; }, [dbSessionId]);
 
   const sanitizeError = (msg: string): string => {
     return msg.replace(/tavus/gi, 'video service');
@@ -36,6 +46,10 @@ export default function VideoPlayer({ videoId, initialHostedUrl, onReset, dbSess
       const data = await response.json();
 
       if (data.success) {
+        const currentEmail = userEmailRef.current;
+        const currentUserName = userNameRef.current;
+        const currentDbSessionId = dbSessionIdRef.current;
+        console.log('[VideoPlayer] Poll result — status:', data.status, '| userEmail:', currentEmail, '| dbSessionId:', currentDbSessionId);
         setStatus(data.status);
         if (data.hostedUrl) setHostedUrl(data.hostedUrl);
         if (data.downloadUrl) setDownloadUrl(data.downloadUrl);
@@ -45,24 +59,41 @@ export default function VideoPlayer({ videoId, initialHostedUrl, onReset, dbSess
           if (timerRef.current) clearInterval(timerRef.current);
           if (data.status === 'error') {
             setErrorMessage(sanitizeError(data.errorMessage || 'Video generation failed'));
-            // Mark session as failed
-            if (dbSessionId) {
-              updateSession(dbSessionId, { status: 'failed' });
+            if (currentDbSessionId) {
+              updateSession(currentDbSessionId, { status: 'failed' });
             }
           }
           // Save GCS URL and mark completed in Supabase
-          if (data.status === 'ready' && dbSessionId) {
-            updateSession(dbSessionId, {
+          if (data.status === 'ready' && currentDbSessionId) {
+            updateSession(currentDbSessionId, {
               hosted_url: data.gcsUrl || data.hostedUrl || null,
               status: 'completed',
             });
+          }
+          // Send email notification (independent of dbSessionId)
+          if (data.status === 'ready' && currentEmail) {
+            const videoLink = data.gcsUrl || data.hostedUrl;
+            console.log('[VideoPlayer] Sending email notification — email:', currentEmail, '| videoUrl:', videoLink);
+            fetch(`${API_BASE}/api/send-notification`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: currentEmail,
+                userName: currentUserName,
+                videoUrl: videoLink,
+                mode: 'summary',
+              }),
+            })
+              .then((r) => r.json())
+              .then((r) => console.log('[VideoPlayer] Notification response:', r))
+              .catch((err) => console.error('[VideoPlayer] Notification error:', err));
           }
         }
       }
     } catch {
       // Silently retry on next poll
     }
-  }, [videoId, dbSessionId]);
+  }, [videoId]);
 
   useEffect(() => {
     // Start polling every 10 seconds
@@ -159,6 +190,9 @@ export default function VideoPlayer({ videoId, initialHostedUrl, onReset, dbSess
             {status === 'queued' ? 'Your video is queued for processing...' : 'Your video is being generated...'}
           </p>
           <p className="text-xs text-muted-foreground">Elapsed: {formatTime(elapsedSeconds)}</p>
+          <p className="text-xs text-muted-foreground/70 mt-2">
+            We&apos;ll send you an email with the download link once your video is ready.
+          </p>
         </motion.div>
       )}
 

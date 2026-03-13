@@ -135,6 +135,7 @@ export default function Home() {
 
     // Create a new session in Supabase
     const fileName = file ? file.name.replace(/\.pdf$/i, '') : '';
+    console.log('[page] Creating session — authSession email:', authSession?.user?.email);
     if (authSession?.user?.email) {
       const session = await createSession({
         user_email: authSession.user.email,
@@ -145,9 +146,12 @@ export default function Home() {
         character_count: chars,
         pbp_data: { pdfFileName: fileName },
       });
+      console.log('[page] Session created:', session?.id || 'FAILED');
       if (session) {
         setDbSessionId(session.id);
       }
+    } else {
+      console.warn('[page] No auth session — dbSessionId will be null, email notifications will not work');
     }
 
     setCurrentStep('mode-select');
@@ -304,6 +308,8 @@ export default function Home() {
                   onReset={handleReset}
                   dbSessionId={dbSessionId}
                   downloadFileName={pdfFileName ? `${pdfFileName}.mp4` : undefined}
+                  userEmail={authSession?.user?.email || undefined}
+                  userName={authSession?.user?.name || undefined}
                 />
               </div>
             )}
@@ -317,6 +323,8 @@ export default function Home() {
                 onReset={handleReset}
                 dbSessionId={dbSessionId}
                 downloadFileName={pdfFileName ? `${pdfFileName}.mp4` : undefined}
+                userEmail={authSession?.user?.email || undefined}
+                userName={authSession?.user?.name || undefined}
               />
             )}
           </motion.div>

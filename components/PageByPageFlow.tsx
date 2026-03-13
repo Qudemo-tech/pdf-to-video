@@ -25,6 +25,8 @@ interface PageByPageFlowProps {
   onReset: () => void;
   dbSessionId: string | null;
   downloadFileName?: string;
+  userEmail?: string;
+  userName?: string;
 }
 
 const STEP_LABELS: Record<PageByPageStep, string> = {
@@ -51,6 +53,8 @@ export default function PageByPageFlow({
   onReset,
   dbSessionId,
   downloadFileName,
+  userEmail,
+  userName,
 }: PageByPageFlowProps) {
   const [step, setStep] = useState<PageByPageStep>('converting-pages');
   const [error, setError] = useState<string | null>(null);
@@ -189,7 +193,25 @@ export default function PageByPageFlow({
       totalVideos: readyVideos.length,
       outputVideoUrl: outputUrl,
     });
-  }, [pollVideos, stitchVideos, savePbpToDb, imageUrls, scripts]);
+
+    // Send email notification (non-blocking)
+    if (userEmail) {
+      console.log('[PageByPageFlow:resume] Sending email notification — email:', userEmail, '| videoUrl:', outputUrl);
+      fetch(`${API_BASE}/api/send-notification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userEmail,
+          userName,
+          videoUrl: outputUrl,
+          mode: 'page-by-page',
+        }),
+      })
+        .then((r) => r.json())
+        .then((r) => console.log('[PageByPageFlow:resume] Notification response:', r))
+        .catch((err) => console.error('[PageByPageFlow:resume] Notification error:', err));
+    }
+  }, [pollVideos, stitchVideos, savePbpToDb, imageUrls, scripts, userEmail, userName]);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -377,6 +399,24 @@ export default function PageByPageFlow({
           totalVideos: numVideos,
           outputVideoUrl: outputUrl,
         });
+
+        // Send email notification (non-blocking)
+        if (userEmail) {
+          console.log('[PageByPageFlow] Sending email notification — email:', userEmail, '| videoUrl:', outputUrl);
+          fetch(`${API_BASE}/api/send-notification`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: userEmail,
+              userName,
+              videoUrl: outputUrl,
+              mode: 'page-by-page',
+            }),
+          })
+            .then((r) => r.json())
+            .then((r) => console.log('[PageByPageFlow] Notification response:', r))
+            .catch((err) => console.error('[PageByPageFlow] Notification error:', err));
+        }
       } catch (err) {
         console.error('Page-by-page flow error:', err);
         const msg = err instanceof Error ? err.message : 'An unexpected error occurred';
@@ -483,6 +523,9 @@ export default function PageByPageFlow({
           {(step === 'generating-videos' || step === 'stitching') && (
             <p className="text-xs text-muted-foreground">This may take several minutes</p>
           )}
+          <p className="text-xs text-muted-foreground/70 mt-2">
+            We&apos;ll send you an email with the download link once your video is ready.
+          </p>
         </motion.div>
       )}
 
