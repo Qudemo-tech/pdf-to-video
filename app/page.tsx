@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSession } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import Navbar from '@/components/landing/Navbar';
 import HeroSection from '@/components/landing/HeroSection';
@@ -258,12 +258,25 @@ export default function Home() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="glass-card p-6 md:p-8"
           >
-            {/* Step 1: Upload */}
+            {/* Step 1: Upload (requires auth) */}
             {currentStep === 'upload' && (
-              <div>
-                <h2 className="text-xl font-semibold text-foreground mb-4">Upload Your PDF</h2>
-                <PDFUploader onTextExtracted={handleTextExtracted} />
-              </div>
+              authSession ? (
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground mb-4">Upload Your PDF</h2>
+                  <PDFUploader onTextExtracted={handleTextExtracted} />
+                </div>
+              ) : (
+                <div className="text-center py-8 space-y-4">
+                  <h2 className="text-xl font-semibold text-foreground">Sign in to get started</h2>
+                  <p className="text-muted-foreground text-sm">Sign in with Google to upload your PDF and generate videos.</p>
+                  <button
+                    onClick={() => signIn('google', { callbackUrl: '/#upload' })}
+                    className="btn-primary-glow inline-flex items-center gap-2 px-6 py-3"
+                  >
+                    Sign in with Google
+                  </button>
+                </div>
+              )
             )}
 
             {/* Step 1.5: Mode Selection */}
