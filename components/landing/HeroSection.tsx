@@ -35,7 +35,7 @@ export default function HeroSection() {
           >
             <h1 className="text-4xl sm:text-5xl lg:text-[64px] font-bold leading-[1.05] tracking-[-0.02em] text-foreground mb-6">
               Stop Sending Slides.{' '}
-              <span className="text-gradient-primary">Send Videos That Convert.</span>
+              <span className="text-gradient-primary">Send Videos That Explain.</span>
             </h1>
 
             {/* Audience toggle */}
@@ -125,7 +125,7 @@ export default function HeroSection() {
                 </div>
                 <div className="flex-1 mx-4">
                   <div className="bg-white/[0.06] rounded-md px-3 py-1 text-xs text-muted-foreground text-center">
-                    slidetovideo.ai/demo
+                    pdftovideo.ai/demo
                   </div>
                 </div>
               </div>

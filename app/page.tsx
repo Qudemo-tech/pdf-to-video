@@ -5,7 +5,6 @@ import { signIn, useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import Navbar from '@/components/landing/Navbar';
 import HeroSection from '@/components/landing/HeroSection';
-import FeatureStrip from '@/components/landing/FeatureStrip';
 import DemoSection from '@/components/landing/DemoSection';
 import HowItWorks from '@/components/landing/HowItWorks';
 import UseCases from '@/components/landing/UseCases';
@@ -227,7 +226,6 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <HeroSection />
-      <FeatureStrip />
       <DemoSection />
       <HowItWorks />
       <UseCases />

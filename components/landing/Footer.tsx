@@ -54,7 +54,7 @@ export default function Footer() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8 border-t border-white/[0.04]">
-            <p className="text-xs text-muted-foreground">&copy; 2026 SlideToVideo. All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">&copy; 2026 PDFToVideo. All rights reserved.</p>
             <div className="flex items-center gap-4">
               {['Twitter', 'LinkedIn', 'YouTube'].map((s) => (
                 <a key={s} href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">{s}</a>
