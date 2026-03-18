@@ -1,24 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 
 const DEMO_VIDEO = 'https://storage.cloud.google.com/pdftovideo/6d4bd452.mp4';
 
-const heroContent = {
-  teams: {
-    sub: 'Close deals faster. Replace decks with 2-minute video pitches your clients will actually watch.',
-  },
-  educators: {
-    sub: 'Turn your lecture slides into video lessons your students can replay, rewind, and actually retain.',
-  },
-};
-
 const logos = ['Notion', 'Linear', 'Vercel', 'Stripe', 'Figma', 'Loom'];
 
 export default function HeroSection() {
-  const [audience, setAudience] = useState<'teams' | 'educators'>('teams');
-
   return (
     <section className="relative min-h-screen flex items-center section-padding grain-overlay overflow-hidden pt-24">
       {/* Background glow */}
@@ -38,32 +26,9 @@ export default function HeroSection() {
               <span className="text-gradient-primary">Send Videos That Explain.</span>
             </h1>
 
-            {/* Audience toggle */}
-            <div className="flex items-center gap-1 mb-5 bg-secondary rounded-full p-1 w-fit">
-              {(['teams', 'educators'] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setAudience(t)}
-                  className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                    audience === t
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {t === 'teams' ? 'For Teams' : 'For Educators'}
-                </button>
-              ))}
-            </div>
-
-            <motion.p
-              key={audience}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className="text-lg sm:text-xl text-muted-foreground leading-relaxed mb-8 max-w-xl"
-            >
-              {heroContent[audience].sub}
-            </motion.p>
+            <p className="text-lg sm:text-xl text-muted-foreground leading-relaxed mb-8 max-w-xl">
+              Transform your PDFs into engaging videos with AI-powered narration. Upload, generate, and share in minutes.
+            </p>
 
             <div className="flex flex-wrap gap-4 mb-10">
               <a href="#upload" className="btn-primary-glow inline-block">
