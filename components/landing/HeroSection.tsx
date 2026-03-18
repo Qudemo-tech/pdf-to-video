@@ -4,8 +4,6 @@ import { motion } from 'framer-motion';
 
 const DEMO_VIDEO = 'https://storage.cloud.google.com/pdftovideo/6d4bd452.mp4';
 
-const logos = ['Notion', 'Linear', 'Vercel', 'Stripe', 'Figma', 'Loom'];
-
 export default function HeroSection() {
   return (
     <section className="relative min-h-screen flex items-center section-padding grain-overlay overflow-hidden pt-24">
@@ -39,27 +37,6 @@ export default function HeroSection() {
               </a>
             </div>
 
-            {/* Trust bar */}
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Trusted by 12,000+ teams at</p>
-              <div className="flex items-center gap-6 flex-wrap">
-                {logos.map((name) => (
-                  <span
-                    key={name}
-                    className="text-muted-foreground/50 font-semibold text-sm tracking-wider uppercase"
-                  >
-                    {name}
-                  </span>
-                ))}
-              </div>
-              <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 flex-wrap">
-                <span>850K+ videos created</span>
-                <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
-                <span>4.9&#9733; on Product Hunt</span>
-                <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
-                <span>SOC 2 Compliant</span>
-              </div>
-            </div>
           </motion.div>
 
           {/* Right - Video mockup */}

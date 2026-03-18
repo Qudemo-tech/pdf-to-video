@@ -35,9 +35,6 @@ export default function HowItWorks() {
         </motion.h2>
 
         <div className="grid md:grid-cols-3 gap-8 relative">
-          {/* Connecting line */}
-          <div className="hidden md:block absolute top-12 left-[20%] right-[20%] h-px bg-gradient-to-r from-primary/40 via-accent/30 to-primary/40" />
-
           {steps.map((step, i) => (
             <motion.div
               key={step.title}
