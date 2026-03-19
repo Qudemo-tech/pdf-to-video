@@ -7,6 +7,7 @@ import { PageByPageStep, PageScript, PageVideo } from '@/types';
 import { API_BASE } from '@/lib/api';
 import { updateSession, getSessionById } from '@/lib/sessions';
 import { downloadWithFilename } from '@/lib/download';
+import { checkCredits, deductCredits } from '@/lib/credits';
 
 interface PbpSessionData {
   step: PageByPageStep;
@@ -27,6 +28,8 @@ interface PageByPageFlowProps {
   downloadFileName?: string;
   userEmail?: string;
   userName?: string;
+  creditBalance?: number;
+  onCreditsChanged?: (balance: number) => void;
 }
 
 const STEP_LABELS: Record<PageByPageStep, string> = {
@@ -55,6 +58,8 @@ export default function PageByPageFlow({
   downloadFileName,
   userEmail,
   userName,
+  creditBalance,
+  onCreditsChanged,
 }: PageByPageFlowProps) {
   const [step, setStep] = useState<PageByPageStep>('converting-pages');
   const [error, setError] = useState<string | null>(null);
@@ -194,6 +199,21 @@ export default function PageByPageFlow({
       outputVideoUrl: outputUrl,
     });
 
+    // Deduct credits based on total script word count
+    if (userEmail && scripts.length > 0) {
+      const totalWords = scripts.reduce((sum, s) => sum + (s.wordCount || 0), 0);
+      const totalMinutes = Math.round((totalWords / 150) * 100) / 100;
+      if (totalMinutes > 0) {
+        const result = await deductCredits({
+          user_email: userEmail,
+          amount: totalMinutes,
+          video_session_id: dbSessionId || undefined,
+          description: downloadFileName ? `Video: ${downloadFileName.replace(/\.mp4$/, '')}` : 'Page-by-page video',
+        });
+        onCreditsChanged?.(result.balance);
+      }
+    }
+
     // Send email notification (non-blocking)
     if (userEmail) {
       console.log('[PageByPageFlow:resume] Sending email notification — email:', userEmail, '| videoUrl:', outputUrl);
@@ -211,7 +231,7 @@ export default function PageByPageFlow({
         .then((r) => console.log('[PageByPageFlow:resume] Notification response:', r))
         .catch((err) => console.error('[PageByPageFlow:resume] Notification error:', err));
     }
-  }, [pollVideos, stitchVideos, savePbpToDb, imageUrls, scripts, userEmail, userName]);
+  }, [pollVideos, stitchVideos, savePbpToDb, imageUrls, scripts, userEmail, userName, dbSessionId, downloadFileName, onCreditsChanged]);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -285,6 +305,16 @@ export default function PageByPageFlow({
 
     const runFreshPipeline = async () => {
       try {
+        // Credit check before starting
+        if (userEmail) {
+          const creditCheck = await checkCredits(userEmail);
+          if (!creditCheck.hasCredits) {
+            setError('You need at least 1 credit to generate a video. Purchase credits to continue.');
+            setStep('error');
+            return;
+          }
+        }
+
         // Step 1: Convert pages to images
         setStep('converting-pages');
         const formData = new FormData();
@@ -335,6 +365,7 @@ export default function PageByPageFlow({
             videoName: scriptItem.pageNumber === 0
               ? 'Intro'
               : `Page ${scriptItem.pageNumber}`,
+            ...(userEmail ? { user_email: userEmail } : {}),
           };
 
           const videoRes = await fetch(`${API_BASE}/api/generate-video`, {
@@ -399,6 +430,21 @@ export default function PageByPageFlow({
           totalVideos: numVideos,
           outputVideoUrl: outputUrl,
         });
+
+        // Deduct credits based on total script word count
+        if (userEmail) {
+          const totalWords = allScripts.reduce((sum: number, s: PageScript) => sum + (s.wordCount || 0), 0);
+          const totalMinutes = Math.round((totalWords / 150) * 100) / 100;
+          if (totalMinutes > 0) {
+            const result = await deductCredits({
+              user_email: userEmail,
+              amount: totalMinutes,
+              video_session_id: dbSessionId || undefined,
+              description: downloadFileName ? `Video: ${downloadFileName.replace(/\.mp4$/, '')}` : 'Page-by-page video',
+            });
+            onCreditsChanged?.(result.balance);
+          }
+        }
 
         // Send email notification (non-blocking)
         if (userEmail) {
@@ -540,6 +586,11 @@ export default function PageByPageFlow({
             <AlertCircle className="w-6 h-6 text-destructive" />
           </div>
           <p className="text-sm text-destructive">{error}</p>
+          {error?.includes('credit') && (
+            <a href="#pricing" className="inline-block mt-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:brightness-110 transition-all">
+              Buy Credits
+            </a>
+          )}
         </motion.div>
       )}
 

@@ -18,6 +18,7 @@ import {
   getActiveSession,
   updateSession,
 } from '@/lib/sessions';
+import { getCredits } from '@/lib/credits';
 
 export default function Home() {
   const { data: authSession } = useSession();
@@ -31,6 +32,10 @@ export default function Home() {
   // PDF file reference (needed for page-by-page mode to re-upload for conversion)
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfFileName, setPdfFileName] = useState<string>('');
+
+  // Credits
+  const [creditBalance, setCreditBalance] = useState<number>(0);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   // Step 1 → 2 data
   const [extractedText, setExtractedText] = useState('');
@@ -48,6 +53,23 @@ export default function Home() {
     restoredRef.current = true;
 
     const restore = async () => {
+      // Fetch credit balance
+      const credits = await getCredits(authSession.user!.email!);
+      setCreditBalance(credits.balance);
+
+      // Check for payment success redirect
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('payment') === 'success') {
+        setPaymentSuccess(true);
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+        // Re-fetch credits after short delay for webhook processing
+        setTimeout(async () => {
+          const updated = await getCredits(authSession.user!.email!);
+          setCreditBalance(updated.balance);
+        }, 2000);
+      }
+
       const saved = await getActiveSession(authSession.user!.email!);
       if (saved) {
         setDbSessionId(saved.id);
@@ -156,7 +178,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      <Navbar creditBalance={creditBalance} />
       <HeroSection />
       <DemoSection />
       <HowItWorks />
@@ -215,6 +237,8 @@ export default function Home() {
                 downloadFileName={pdfFileName ? `${pdfFileName}.mp4` : undefined}
                 userEmail={authSession?.user?.email || undefined}
                 userName={authSession?.user?.name || undefined}
+                creditBalance={creditBalance}
+                onCreditsChanged={setCreditBalance}
               />
             )}
           </motion.div>
@@ -222,6 +246,13 @@ export default function Home() {
       </section>
 
       <div id="pricing">
+        {paymentSuccess && (
+          <div className="container mx-auto max-w-3xl px-4 pt-8">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 text-center">
+              <p className="text-sm text-primary font-medium">Payment successful! Your credits have been added.</p>
+            </div>
+          </div>
+        )}
         <PricingSection />
       </div>
       <Footer />

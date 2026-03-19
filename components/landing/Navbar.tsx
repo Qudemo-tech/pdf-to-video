@@ -1,11 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { Menu, X, Coins } from 'lucide-react';
 import { GetStartedButton } from '@/components/GetStartedButton';
 
-export default function Navbar() {
+interface NavbarProps {
+  creditBalance?: number;
+}
+
+export default function Navbar({ creditBalance }: NavbarProps) {
   const [open, setOpen] = useState(false);
+  const { data: session } = useSession();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.04] bg-background/80 backdrop-blur-xl">
@@ -18,6 +24,12 @@ export default function Navbar() {
           <a href="#demo" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Demo</a>
           <GetStartedButton className="text-sm text-muted-foreground hover:text-foreground transition-colors">Try It</GetStartedButton>
           <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+          {session && creditBalance != null && (
+            <a href="#pricing" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-sm font-medium text-primary hover:bg-primary/20 transition-colors">
+              <Coins className="w-3.5 h-3.5" />
+              {creditBalance} credits
+            </a>
+          )}
           <GetStartedButton
             className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:brightness-110 transition-all"
             showLogoutWhenSignedIn
@@ -36,6 +48,12 @@ export default function Navbar() {
           <a href="#demo" onClick={() => setOpen(false)} className="block text-sm text-muted-foreground py-2">Demo</a>
           <GetStartedButton className="block text-sm text-muted-foreground py-2" onClick={() => setOpen(false)}>Try It</GetStartedButton>
           <a href="#pricing" onClick={() => setOpen(false)} className="block text-sm text-muted-foreground py-2">Pricing</a>
+          {session && creditBalance != null && (
+            <a href="#pricing" onClick={() => setOpen(false)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-sm font-medium text-primary">
+              <Coins className="w-3.5 h-3.5" />
+              {creditBalance} credits
+            </a>
+          )}
           <GetStartedButton
             className="block text-center px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium w-full"
             onClick={() => setOpen(false)}

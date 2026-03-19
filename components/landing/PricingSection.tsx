@@ -1,40 +1,70 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
-import { GetStartedButton } from '@/components/GetStartedButton';
+import { signIn, useSession } from 'next-auth/react';
+import { createCheckoutSession } from '@/lib/credits';
 
 const plans = [
   {
     name: 'Starter',
     price: 10,
-    minutes: 10,
-    badge: 'Limited Offer',
-    features: ['10 minutes of video', '1080p resolution', 'AI narration & captions', 'MP4 download', '3 voice options'],
+    credits: 3,
+    planId: 'starter' as const,
+    badge: null,
+    features: ['3 credits (3 min of video)', '1080p resolution', 'AI narration & captions', 'MP4 download', '3 voice options'],
     cta: 'Get Started',
     highlight: false,
   },
   {
-    name: 'Creator',
+    name: 'Best Value',
     price: 50,
-    minutes: 25,
+    credits: 20,
+    planId: 'bestvalue' as const,
     badge: 'Best Value',
-    features: ['25 minutes of video', '1080p resolution', 'AI narration & captions', '30+ voices & 12 languages', 'Brand kit', 'Priority rendering'],
+    features: ['20 credits (20 min of video)', '1080p resolution', 'AI narration & captions', '30+ voices & 12 languages', 'Brand kit', 'Priority rendering'],
     cta: 'Get Started',
     highlight: true,
   },
   {
     name: 'Business',
     price: 100,
-    minutes: 50,
+    credits: 50,
+    planId: 'business' as const,
     badge: null,
-    features: ['50 minutes of video', '1080p resolution', 'All export options', '30+ voices & 12 languages', 'Brand kit', 'API access', 'Analytics dashboard'],
+    features: ['50 credits (50 min of video)', '1080p resolution', 'All export options', '30+ voices & 12 languages', 'Brand kit', 'API access', 'Analytics dashboard'],
     cta: 'Get Started',
     highlight: false,
   },
 ];
 
 export default function PricingSection() {
+  const { data: session } = useSession();
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  const handlePurchase = async (planId: 'starter' | 'bestvalue' | 'business') => {
+    if (!session?.user?.email) {
+      signIn('google', { callbackUrl: '/#pricing' });
+      return;
+    }
+
+    setLoadingPlan(planId);
+    try {
+      const { url } = await createCheckoutSession({
+        user_email: session.user.email,
+        plan: planId,
+      });
+      if (url) {
+        window.location.href = url;
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
   return (
     <section className="section-padding border-t border-white/[0.04]">
       <div className="container mx-auto max-w-5xl">
@@ -45,7 +75,8 @@ export default function PricingSection() {
           className="text-center mb-12"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Simple Pricing</h2>
-          <p className="text-muted-foreground">Buy video minutes. No subscriptions, no surprises.</p>
+          <p className="text-muted-foreground">Buy video credits. No subscriptions, no surprises.</p>
+          <p className="text-muted-foreground text-sm mt-1">1 credit = 1 minute of video</p>
         </motion.div>
 
         <div className="grid md:grid-cols-3 gap-6">
@@ -73,7 +104,7 @@ export default function PricingSection() {
                   ${plan.price}
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground mb-6">{plan.minutes} minutes of video</p>
+              <p className="text-sm text-muted-foreground mb-6">{plan.credits} credits</p>
               <ul className="space-y-3 mb-8">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-start gap-2.5 text-sm text-muted-foreground">
@@ -82,15 +113,17 @@ export default function PricingSection() {
                   </li>
                 ))}
               </ul>
-              <GetStartedButton
-                className={`w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-center block ${
+              <button
+                onClick={() => handlePurchase(plan.planId)}
+                disabled={loadingPlan === plan.planId}
+                className={`w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-center block cursor-pointer disabled:opacity-50 ${
                   plan.highlight
                     ? 'btn-primary-glow !py-3 !text-sm'
                     : 'bg-secondary text-foreground hover:bg-secondary/80'
                 }`}
               >
-                {plan.cta}
-              </GetStartedButton>
+                {loadingPlan === plan.planId ? 'Redirecting...' : plan.cta}
+              </button>
             </motion.div>
           ))}
         </div>

@@ -2,7 +2,9 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Play } from 'lucide-react';
+
+const DEMO_PDF = 'https://storage.cloud.google.com/pdftovideo/pdfs/pdftovideo.pdf';
+const DEMO_VIDEO = 'https://storage.cloud.google.com/pdftovideo/videos/WhatsApp%20Video%202026-03-16%20at%201.13.55%20AM.mp4';
 
 export default function DemoSection() {
   const [sliderPos, setSliderPos] = useState(50);
@@ -45,45 +47,36 @@ export default function DemoSection() {
           onPointerLeave={handlePointerUp}
           onPointerMove={(e) => handleMove(e.clientX)}
         >
-          {/* Left: Static PDF */}
-          <div className="absolute inset-0 bg-[#1a1a2e] flex items-center justify-center p-8 md:p-16">
-            <div className="w-full max-w-md bg-white/[0.03] border border-white/[0.06] rounded-lg p-6 md:p-10">
-              <div className="space-y-3">
-                <div className="h-4 bg-white/[0.06] rounded w-3/4" />
-                <div className="h-3 bg-white/[0.04] rounded w-full" />
-                <div className="h-3 bg-white/[0.04] rounded w-5/6" />
-                <div className="h-3 bg-white/[0.04] rounded w-2/3" />
-                <div className="mt-6 h-20 bg-white/[0.03] rounded" />
-                <div className="h-3 bg-white/[0.04] rounded w-1/2" />
-              </div>
-              <p className="text-xs text-muted-foreground/50 mt-6 text-center">Static PDF Slide</p>
+          {/* Left: Video */}
+          <div className="absolute inset-0">
+            <video
+              src={DEMO_VIDEO}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm rounded px-2 py-1">
+              <p className="text-xs text-white/80">AI Video</p>
             </div>
           </div>
 
-          {/* Right: Polished video */}
+          {/* Right: Static PDF */}
           <div
-            className="absolute inset-0 overflow-hidden"
+            className="absolute inset-0 overflow-hidden bg-[#1a1a2e]"
             style={{ clipPath: `inset(0 0 0 ${sliderPos}%)` }}
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-card to-accent/10 flex items-center justify-center p-8 md:p-16">
-              <div className="w-full max-w-md glass-card p-6 md:p-10 glow-border">
-                <div className="space-y-3">
-                  <div className="h-4 bg-primary/30 rounded w-3/4" />
-                  <div className="h-3 bg-foreground/20 rounded w-full" />
-                  <div className="h-3 bg-foreground/20 rounded w-5/6" />
-                  <div className="h-3 bg-foreground/15 rounded w-2/3" />
-                  <div className="mt-6 h-20 bg-gradient-to-r from-primary/20 to-accent/20 rounded flex items-center justify-center">
-                    <Play className="w-8 h-8 text-primary" />
-                  </div>
-                  <div className="flex gap-1 mt-2">
-                    <div className="h-1.5 bg-primary/40 rounded flex-1" />
-                    <div className="h-1.5 bg-accent/30 rounded flex-1" />
-                  </div>
-                </div>
-                <div className="mt-4 px-3 py-1.5 bg-black/40 rounded-md">
-                  <p className="text-xs text-foreground/80">&#9654; &quot;Here&apos;s our quarterly growth...&quot;</p>
-                </div>
-              </div>
+            <iframe
+              src={DEMO_PDF}
+              className="absolute top-0 h-full border-0 pointer-events-none"
+              style={{ left: '-200px', width: 'calc(100% + 200px)' }}
+              title="PDF preview"
+            />
+            {/* Cover GCS viewer "anonymous" label */}
+            <div className="absolute top-0 left-0 w-40 h-10 bg-[#1a1a2e]" />
+            <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded px-2 py-1">
+              <p className="text-xs text-white/80">Static PDF</p>
             </div>
           </div>
 
