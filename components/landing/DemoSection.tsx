@@ -3,8 +3,8 @@
 import { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 
-const DEMO_PDF = 'https://storage.cloud.google.com/pdftovideo/pdfs/pdftovideo.pdf';
-const DEMO_VIDEO = 'https://storage.cloud.google.com/pdftovideo/videos/WhatsApp%20Video%202026-03-16%20at%201.13.55%20AM.mp4';
+const DEMO_PDF = 'https://storage.googleapis.com/pdftovideo/pdfs/pdftovideo.pdf';
+const DEMO_VIDEO = 'https://storage.googleapis.com/pdftovideo/videos/WhatsApp%20Video%202026-03-16%20at%201.13.55%20AM.mp4';
 
 export default function DemoSection() {
   const [sliderPos, setSliderPos] = useState(50);

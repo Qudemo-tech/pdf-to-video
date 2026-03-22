@@ -4,7 +4,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, Maximize, Minimize, Pause, Play, Presentation } from 'lucide-react';
 
-const DEMO_VIDEO = 'https://storage.cloud.google.com/pdftovideo/videos/WhatsApp%20Video%202026-03-16%20at%201.13.55%20AM.mp4';
+const DEMO_VIDEO = 'https://storage.googleapis.com/pdftovideo/videos/WhatsApp%20Video%202026-03-16%20at%201.13.55%20AM.mp4';
 
 export default function HeroSection() {
   const videoRef = useRef<HTMLVideoElement>(null);
