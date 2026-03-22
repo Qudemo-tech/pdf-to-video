@@ -72,6 +72,17 @@ export default function PageByPageFlow({
   const [outputVideoUrl, setOutputVideoUrl] = useState<string | null>(null);
   const startedRef = useRef(false);
 
+  // Insufficient credits prompt state
+  const [showCreditPrompt, setShowCreditPrompt] = useState(false);
+  const [creditsNeeded, setCreditsNeeded] = useState(0);
+  const [creditsAvailable, setCreditsAvailable] = useState(0);
+  const [affordablePageCount, setAffordablePageCount] = useState(0);
+  // Store pipeline data needed to resume after user choice
+  const pendingPipelineRef = useRef<{
+    allScripts: PageScript[];
+    convertData: { imageUrls: string[]; localPaths: string[] };
+  } | null>(null);
+
   // Save page-by-page state to Supabase
   const savePbpToDb = useCallback(async (data: PbpSessionData) => {
     if (!dbSessionId) return;
@@ -233,6 +244,155 @@ export default function PageByPageFlow({
     }
   }, [pollVideos, stitchVideos, savePbpToDb, imageUrls, scripts, userEmail, userName, dbSessionId, downloadFileName, onCreditsChanged]);
 
+  // Generate videos, stitch, deduct credits, and send notification
+  const generateVideosAndFinish = useCallback(async (
+    scriptsToUse: PageScript[],
+    convertData: { imageUrls: string[]; localPaths: string[] },
+  ) => {
+    setStep('generating-videos');
+    setScripts(scriptsToUse);
+    const numVideos = scriptsToUse.length;
+    setTotalVideos(numVideos);
+
+    const videos: PageVideo[] = [];
+
+    for (const scriptItem of scriptsToUse) {
+      const payload: Record<string, string> = {
+        script: scriptItem.script,
+        videoName: scriptItem.pageNumber === 0
+          ? 'Intro'
+          : `Page ${scriptItem.pageNumber}`,
+        ...(userEmail ? { user_email: userEmail } : {}),
+      };
+
+      const videoRes = await fetch(`${API_BASE}/api/generate-video`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const videoData = await videoRes.json();
+
+      if (!videoData.success) {
+        throw new Error(videoData.error || `Failed to generate video for page ${scriptItem.pageNumber}`);
+      }
+
+      videos.push({
+        pageNumber: scriptItem.pageNumber,
+        videoId: videoData.videoId,
+        status: videoData.status || 'queued',
+        hostedUrl: videoData.hostedUrl,
+      });
+    }
+
+    setPageVideos(videos);
+
+    // Save session so refresh can resume from here
+    await savePbpToDb({
+      step: 'generating-videos',
+      imageUrls: convertData.imageUrls,
+      localPaths: convertData.localPaths,
+      scripts: scriptsToUse,
+      pageVideos: videos,
+      totalVideos: numVideos,
+      outputVideoUrl: null,
+    });
+
+    // Poll until all ready
+    const readyVideos = await pollVideos(videos);
+    setPageVideos(readyVideos);
+
+    // Stitch videos
+    await savePbpToDb({
+      step: 'stitching',
+      imageUrls: convertData.imageUrls,
+      localPaths: convertData.localPaths,
+      scripts: scriptsToUse,
+      pageVideos: readyVideos,
+      totalVideos: numVideos,
+      outputVideoUrl: null,
+    });
+
+    const outputUrl = await stitchVideos(readyVideos, convertData.localPaths);
+
+    setOutputVideoUrl(outputUrl);
+    setStep('done');
+
+    // Save final state
+    await savePbpToDb({
+      step: 'done',
+      imageUrls: convertData.imageUrls,
+      localPaths: convertData.localPaths,
+      scripts: scriptsToUse,
+      pageVideos: readyVideos,
+      totalVideos: numVideos,
+      outputVideoUrl: outputUrl,
+    });
+
+    // Deduct credits based on total script word count
+    if (userEmail) {
+      const totalWords = scriptsToUse.reduce((sum: number, s: PageScript) => sum + (s.wordCount || 0), 0);
+      const totalMinutes = Math.round((totalWords / 150) * 100) / 100;
+      if (totalMinutes > 0) {
+        const result = await deductCredits({
+          user_email: userEmail,
+          amount: totalMinutes,
+          video_session_id: dbSessionId || undefined,
+          description: downloadFileName ? `Video: ${downloadFileName.replace(/\.mp4$/, '')}` : 'Page-by-page video',
+        });
+        onCreditsChanged?.(result.balance);
+      }
+    }
+
+    // Send email notification (non-blocking)
+    if (userEmail) {
+      fetch(`${API_BASE}/api/send-notification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userEmail,
+          userName,
+          videoUrl: outputUrl,
+          mode: 'page-by-page',
+        }),
+      })
+        .then((r) => r.json())
+        .then((r) => console.log('[PageByPageFlow] Notification response:', r))
+        .catch((err) => console.error('[PageByPageFlow] Notification error:', err));
+    }
+  }, [userEmail, userName, dbSessionId, downloadFileName, onCreditsChanged, savePbpToDb, pollVideos, stitchVideos]);
+
+  // Handle user choosing to create partial video
+  const handleCreatePartial = useCallback(async () => {
+    setShowCreditPrompt(false);
+    const pending = pendingPipelineRef.current;
+    if (!pending) return;
+
+    try {
+      const partialScripts = pending.allScripts.slice(0, affordablePageCount);
+      // Also trim localPaths to match — intro (page 0) has no background image,
+      // so localPaths correspond to pages 1..N
+      const pagesWithImages = partialScripts.filter(s => s.pageNumber > 0).length;
+      const partialLocalPaths = pending.convertData.localPaths.slice(0, pagesWithImages);
+
+      await generateVideosAndFinish(partialScripts, {
+        imageUrls: pending.convertData.imageUrls.slice(0, pagesWithImages),
+        localPaths: partialLocalPaths,
+      });
+    } catch (err) {
+      console.error('Page-by-page flow error:', err);
+      const msg = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError(msg.replace(/tavus/gi, 'video service'));
+      setStep('error');
+    }
+  }, [affordablePageCount, generateVideosAndFinish]);
+
+  // Handle user choosing to buy credits
+  const handleBuyCredits = useCallback(() => {
+    setShowCreditPrompt(false);
+    // Navigate to pricing section
+    window.location.href = '#pricing';
+  }, []);
+
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
@@ -351,118 +511,44 @@ export default function PageByPageFlow({
         }
         setScripts(scriptsData.scripts);
 
-        // Step 3: Generate videos
-        setStep('generating-videos');
+        // Step 3: Check credits before generating videos
         const allScripts: PageScript[] = scriptsData.scripts;
-        const numVideos = allScripts.length;
-        setTotalVideos(numVideos);
+        const totalWords = allScripts.reduce((sum: number, s: PageScript) => sum + (s.wordCount || 0), 0);
+        const totalCreditsNeeded = Math.round((totalWords / 150) * 100) / 100;
+        const currentBalance = creditBalance ?? 0;
 
-        const videos: PageVideo[] = [];
+        if (userEmail && totalCreditsNeeded > currentBalance) {
+          // Calculate how many pages the user can afford
+          // Include scripts cumulatively until we exceed the balance
+          let affordableWords = 0;
+          let affordableCount = 0;
+          for (const s of allScripts) {
+            const newTotal = affordableWords + (s.wordCount || 0);
+            const newCredits = Math.round((newTotal / 150) * 100) / 100;
+            if (newCredits > currentBalance) break;
+            affordableWords = newTotal;
+            affordableCount++;
+          }
 
-        for (const scriptItem of allScripts) {
-          const payload: Record<string, string> = {
-            script: scriptItem.script,
-            videoName: scriptItem.pageNumber === 0
-              ? 'Intro'
-              : `Page ${scriptItem.pageNumber}`,
-            ...(userEmail ? { user_email: userEmail } : {}),
+          setCreditsNeeded(totalCreditsNeeded);
+          setCreditsAvailable(currentBalance);
+          setAffordablePageCount(affordableCount);
+          pendingPipelineRef.current = {
+            allScripts,
+            convertData: {
+              imageUrls: convertData.imageUrls,
+              localPaths: convertData.localPaths || [],
+            },
           };
-
-          const videoRes = await fetch(`${API_BASE}/api/generate-video`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          const videoData = await videoRes.json();
-
-          if (!videoData.success) {
-            throw new Error(videoData.error || `Failed to generate video for page ${scriptItem.pageNumber}`);
-          }
-
-          videos.push({
-            pageNumber: scriptItem.pageNumber,
-            videoId: videoData.videoId,
-            status: videoData.status || 'queued',
-            hostedUrl: videoData.hostedUrl,
-          });
+          setShowCreditPrompt(true);
+          return; // Pause pipeline — user must choose
         }
 
-        setPageVideos(videos);
-
-        // Save session so refresh can resume from here
-        await savePbpToDb({
-          step: 'generating-videos',
+        // User has enough credits — proceed with all scripts
+        await generateVideosAndFinish(allScripts, {
           imageUrls: convertData.imageUrls,
           localPaths: convertData.localPaths || [],
-          scripts: scriptsData.scripts,
-          pageVideos: videos,
-          totalVideos: numVideos,
-          outputVideoUrl: null,
         });
-
-        // Poll until all ready
-        const readyVideos = await pollVideos(videos);
-        setPageVideos(readyVideos);
-
-        // Step 4: Stitch videos
-        await savePbpToDb({
-          step: 'stitching',
-          imageUrls: convertData.imageUrls,
-          localPaths: convertData.localPaths || [],
-          scripts: scriptsData.scripts,
-          pageVideos: readyVideos,
-          totalVideos: numVideos,
-          outputVideoUrl: null,
-        });
-
-        const outputUrl = await stitchVideos(readyVideos, convertData.localPaths || []);
-
-        setOutputVideoUrl(outputUrl);
-        setStep('done');
-
-        // Save final state
-        await savePbpToDb({
-          step: 'done',
-          imageUrls: convertData.imageUrls,
-          localPaths: convertData.localPaths || [],
-          scripts: scriptsData.scripts,
-          pageVideos: readyVideos,
-          totalVideos: numVideos,
-          outputVideoUrl: outputUrl,
-        });
-
-        // Deduct credits based on total script word count
-        if (userEmail) {
-          const totalWords = allScripts.reduce((sum: number, s: PageScript) => sum + (s.wordCount || 0), 0);
-          const totalMinutes = Math.round((totalWords / 150) * 100) / 100;
-          if (totalMinutes > 0) {
-            const result = await deductCredits({
-              user_email: userEmail,
-              amount: totalMinutes,
-              video_session_id: dbSessionId || undefined,
-              description: downloadFileName ? `Video: ${downloadFileName.replace(/\.mp4$/, '')}` : 'Page-by-page video',
-            });
-            onCreditsChanged?.(result.balance);
-          }
-        }
-
-        // Send email notification (non-blocking)
-        if (userEmail) {
-          console.log('[PageByPageFlow] Sending email notification — email:', userEmail, '| videoUrl:', outputUrl);
-          fetch(`${API_BASE}/api/send-notification`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: userEmail,
-              userName,
-              videoUrl: outputUrl,
-              mode: 'page-by-page',
-            }),
-          })
-            .then((r) => r.json())
-            .then((r) => console.log('[PageByPageFlow] Notification response:', r))
-            .catch((err) => console.error('[PageByPageFlow] Notification error:', err));
-        }
       } catch (err) {
         console.error('Page-by-page flow error:', err);
         const msg = err instanceof Error ? err.message : 'An unexpected error occurred';
@@ -472,6 +558,7 @@ export default function PageByPageFlow({
     };
 
     restoreAndRun();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdfFile, extractedText, pageCount, pollVideos, stitchVideos, resumeFromVideos, savePbpToDb, dbSessionId]);
 
   const currentStepIndex = STEPS_ORDER.indexOf(step);
@@ -530,7 +617,7 @@ export default function PageByPageFlow({
       </div>
 
       {/* Status Message */}
-      {step !== 'done' && step !== 'error' && (
+      {step !== 'done' && step !== 'error' && !showCreditPrompt && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -572,6 +659,54 @@ export default function PageByPageFlow({
           <p className="text-xs text-muted-foreground/70 mt-2">
             We&apos;ll send you an email with the download link once your video is ready.
           </p>
+        </motion.div>
+      )}
+
+      {/* Insufficient Credits Prompt */}
+      {showCreditPrompt && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-card border border-white/[0.12] rounded-xl p-6 space-y-5"
+        >
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 mx-auto bg-amber-500/20 rounded-full flex items-center justify-center">
+              <AlertCircle className="w-6 h-6 text-amber-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground">Not Enough Credits</h3>
+            <p className="text-sm text-muted-foreground">
+              This video requires <span className="text-foreground font-medium">{creditsNeeded.toFixed(1)} credits</span> but
+              you only have <span className="text-foreground font-medium">{creditsAvailable.toFixed(1)} credits</span>.
+              You need <span className="text-foreground font-medium">{(creditsNeeded - creditsAvailable).toFixed(1)} more credits</span>.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Option 1: Partial Video */}
+            <button
+              onClick={handleCreatePartial}
+              disabled={affordablePageCount === 0}
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-white/[0.08] bg-secondary hover:bg-secondary/80 transition-all text-center disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span className="text-sm font-semibold text-foreground">Create Partial Video</span>
+              <span className="text-xs text-muted-foreground">
+                {affordablePageCount > 0
+                  ? `Generate ${affordablePageCount} of ${pendingPipelineRef.current?.allScripts.length ?? 0} sections with your available credits`
+                  : 'Not enough credits for even 1 section'}
+              </span>
+            </button>
+
+            {/* Option 2: Buy Credits */}
+            <button
+              onClick={handleBuyCredits}
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all text-center"
+            >
+              <span className="text-sm font-semibold text-primary">Buy More Credits</span>
+              <span className="text-xs text-muted-foreground">
+                You need ~{Math.ceil(creditsNeeded - creditsAvailable)} more credits for the full video
+              </span>
+            </button>
+          </div>
         </motion.div>
       )}
 
