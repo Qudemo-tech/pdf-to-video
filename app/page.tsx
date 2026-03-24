@@ -180,7 +180,7 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       <Navbar creditBalance={creditBalance} />
       <HeroSection />
-      <DemoSection />
+      {/* <DemoSection /> */}
       <HowItWorks />
       <UseCases />
 
