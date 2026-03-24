@@ -194,20 +194,7 @@ export default function PageByPageFlow({
       outputVideoUrl: outputUrl,
     });
 
-    // Deduct credits based on total script word count
-    if (userEmail && scripts.length > 0) {
-      const totalWords = scripts.reduce((sum, s) => sum + (s.wordCount || 0), 0);
-      const totalMinutes = Math.round((totalWords / 150) * 100) / 100;
-      if (totalMinutes > 0) {
-        const result = await deductCredits({
-          user_email: userEmail,
-          amount: totalMinutes,
-          video_session_id: dbSessionId || undefined,
-          description: downloadFileName ? `Video: ${downloadFileName.replace(/\.mp4$/, '')}` : 'Page-by-page video',
-        });
-        onCreditsChanged?.(result.balance);
-      }
-    }
+    // Credits already deducted upfront when pipeline started — no deduction here
 
     // Send email notification (non-blocking)
     if (userEmail) {
@@ -312,20 +299,7 @@ export default function PageByPageFlow({
       outputVideoUrl: outputUrl,
     });
 
-    // Deduct credits based on total script word count
-    if (userEmail) {
-      const totalWords = scriptsToUse.reduce((sum: number, s: PageScript) => sum + (s.wordCount || 0), 0);
-      const totalMinutes = Math.round((totalWords / 150) * 100) / 100;
-      if (totalMinutes > 0) {
-        const result = await deductCredits({
-          user_email: userEmail,
-          amount: totalMinutes,
-          video_session_id: dbSessionId || undefined,
-          description: downloadFileName ? `Video: ${downloadFileName.replace(/\.mp4$/, '')}` : 'Page-by-page video',
-        });
-        onCreditsChanged?.(result.balance);
-      }
-    }
+    // Credits already deducted upfront before video generation — no deduction here
 
     // Send email notification (non-blocking)
     if (userEmail) {
@@ -358,6 +332,19 @@ export default function PageByPageFlow({
       const pagesWithImages = partialScripts.filter(s => s.pageNumber > 0).length;
       const partialLocalPaths = pending.convertData.localPaths.slice(0, pagesWithImages);
 
+      // Deduct credits upfront before starting video generation
+      if (userEmail) {
+        const totalWords = partialScripts.reduce((sum: number, s: PageScript) => sum + (s.wordCount || 0), 0);
+        const creditsToDeduct = Math.max(1, Math.ceil(totalWords / 150));
+        const result = await deductCredits({
+          user_email: userEmail,
+          amount: creditsToDeduct,
+          video_session_id: dbSessionId || undefined,
+          description: downloadFileName ? `Video: ${downloadFileName.replace(/\.mp4$/, '')}` : 'Page-by-page video (partial)',
+        });
+        onCreditsChanged?.(result.balance);
+      }
+
       await generateVideosAndFinish(partialScripts, {
         imageUrls: pending.convertData.imageUrls.slice(0, pagesWithImages),
         localPaths: partialLocalPaths,
@@ -368,7 +355,7 @@ export default function PageByPageFlow({
       setError(msg.replace(/tavus/gi, 'video service'));
       setStep('error');
     }
-  }, [affordablePageCount, generateVideosAndFinish]);
+  }, [affordablePageCount, generateVideosAndFinish, userEmail, dbSessionId, downloadFileName, onCreditsChanged]);
 
   // Handle user choosing to buy credits
   const handleBuyCredits = useCallback(() => {
@@ -495,10 +482,10 @@ export default function PageByPageFlow({
         }
         setScripts(scriptsData.scripts);
 
-        // Step 3: Check credits before generating videos
+        // Step 3: Check credits before generating videos (1 credit per minute, minimum 1, rounded up)
         const allScripts: PageScript[] = scriptsData.scripts;
         const totalWords = allScripts.reduce((sum: number, s: PageScript) => sum + (s.wordCount || 0), 0);
-        const totalCreditsNeeded = Math.round((totalWords / 150) * 100) / 100;
+        const totalCreditsNeeded = Math.max(1, Math.ceil(totalWords / 150));
         const currentBalance = creditBalance ?? 0;
 
         if (userEmail && totalCreditsNeeded > currentBalance) {
@@ -508,7 +495,7 @@ export default function PageByPageFlow({
           let affordableCount = 0;
           for (const s of allScripts) {
             const newTotal = affordableWords + (s.wordCount || 0);
-            const newCredits = Math.round((newTotal / 150) * 100) / 100;
+            const newCredits = Math.max(1, Math.ceil(newTotal / 150));
             if (newCredits > currentBalance) break;
             affordableWords = newTotal;
             affordableCount++;
@@ -526,6 +513,17 @@ export default function PageByPageFlow({
           };
           setShowCreditPrompt(true);
           return; // Pause pipeline — user must choose
+        }
+
+        // Deduct credits upfront before starting video generation
+        if (userEmail) {
+          const result = await deductCredits({
+            user_email: userEmail,
+            amount: totalCreditsNeeded,
+            video_session_id: dbSessionId || undefined,
+            description: downloadFileName ? `Video: ${downloadFileName.replace(/\.mp4$/, '')}` : 'Page-by-page video',
+          });
+          onCreditsChanged?.(result.balance);
         }
 
         // User has enough credits — proceed with all scripts
@@ -599,9 +597,9 @@ export default function PageByPageFlow({
             </div>
             <h3 className="text-lg font-semibold text-foreground">Not Enough Credits</h3>
             <p className="text-sm text-muted-foreground">
-              This video requires <span className="text-foreground font-medium">{creditsNeeded.toFixed(1)} credits</span> but
-              you only have <span className="text-foreground font-medium">{creditsAvailable.toFixed(1)} credits</span>.
-              You need <span className="text-foreground font-medium">{(creditsNeeded - creditsAvailable).toFixed(1)} more credits</span>.
+              This video requires <span className="text-foreground font-medium">{creditsNeeded} credits</span> but
+              you only have <span className="text-foreground font-medium">{creditsAvailable} credits</span>.
+              You need <span className="text-foreground font-medium">{creditsNeeded - creditsAvailable} more credits</span>.
             </p>
           </div>
 

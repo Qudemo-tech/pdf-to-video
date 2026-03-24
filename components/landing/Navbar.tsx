@@ -21,7 +21,6 @@ export default function Navbar({ creditBalance }: NavbarProps) {
         </a>
 
         <div className="hidden md:flex items-center gap-8">
-          <a href="#demo" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Demo</a>
           <GetStartedButton className="text-sm text-muted-foreground hover:text-foreground transition-colors">Try It</GetStartedButton>
           <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
           {session && creditBalance != null && (
@@ -45,7 +44,6 @@ export default function Navbar({ creditBalance }: NavbarProps) {
 
       {open && (
         <div className="md:hidden border-t border-white/[0.04] bg-background/95 backdrop-blur-xl px-4 py-4 space-y-3">
-          <a href="#demo" onClick={() => setOpen(false)} className="block text-sm text-muted-foreground py-2">Demo</a>
           <GetStartedButton className="block text-sm text-muted-foreground py-2" onClick={() => setOpen(false)}>Try It</GetStartedButton>
           <a href="#pricing" onClick={() => setOpen(false)} className="block text-sm text-muted-foreground py-2">Pricing</a>
           {session && creditBalance != null && (
