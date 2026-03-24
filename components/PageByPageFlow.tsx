@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, AlertCircle, Download, RotateCcw, ChevronRight } from 'lucide-react';
+import { AlertCircle, Download, RotateCcw } from 'lucide-react';
 import { PageByPageStep, PageScript, PageVideo } from '@/types';
 import { API_BASE } from '@/lib/api';
 import { updateSession, getSessionById } from '@/lib/sessions';
@@ -32,22 +32,6 @@ interface PageByPageFlowProps {
   onCreditsChanged?: (balance: number) => void;
 }
 
-const STEP_LABELS: Record<PageByPageStep, string> = {
-  'converting-pages': 'Converting pages',
-  'generating-scripts': 'Generating scripts',
-  'generating-videos': 'Generating videos',
-  'stitching': 'Stitching video',
-  'done': 'Done',
-  'error': 'Error',
-};
-
-const STEPS_ORDER: PageByPageStep[] = [
-  'converting-pages',
-  'generating-scripts',
-  'generating-videos',
-  'stitching',
-  'done',
-];
 
 export default function PageByPageFlow({
   pdfFile,
@@ -561,104 +545,44 @@ export default function PageByPageFlow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdfFile, extractedText, pageCount, pollVideos, stitchVideos, resumeFromVideos, savePbpToDb, dbSessionId]);
 
-  const currentStepIndex = STEPS_ORDER.indexOf(step);
+  // Compute progress percentage based on real pipeline stage
+  const getProgressPercent = () => {
+    switch (step) {
+      case 'converting-pages': return 10;
+      case 'generating-scripts': return 25;
+      case 'generating-videos':
+        if (totalVideos === 0) return 30;
+        return 30 + Math.round((videosReady / totalVideos) * 50);
+      case 'stitching': return 90;
+      case 'done': return 100;
+      default: return 0;
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-foreground">Page-by-Page Video</h2>
 
-      {/* Progress Steps */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        {STEPS_ORDER.filter((s) => s !== 'done').map((s, index) => {
-          const isCompleted = step === 'done' || index < currentStepIndex;
-          const isCurrent = s === step;
-
-          return (
-            <div key={s} className="flex items-center">
-              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
-                    isCompleted
-                      ? 'bg-primary/20'
-                      : isCurrent
-                        ? 'bg-primary/20'
-                        : 'bg-secondary'
-                  }`}
-                >
-                  {isCompleted ? (
-                    <Check className="w-3.5 h-3.5 text-primary" />
-                  ) : isCurrent ? (
-                    <div className="w-2.5 h-2.5 rounded-full bg-primary animate-progress-pulse" />
-                  ) : (
-                    <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
-                  )}
-                </div>
-                <span
-                  className={`text-xs font-medium transition-colors duration-300 ${
-                    isCompleted
-                      ? 'text-primary'
-                      : isCurrent
-                        ? 'text-foreground'
-                        : 'text-muted-foreground/50'
-                  }`}
-                >
-                  {STEP_LABELS[s]}
-                  {s === 'generating-videos' && isCurrent && totalVideos > 0
-                    ? ` (${videosReady}/${totalVideos})`
-                    : ''}
-                </span>
-              </div>
-              {index < STEPS_ORDER.length - 2 && (
-                <ChevronRight className="w-4 h-4 text-muted-foreground mx-1 flex-shrink-0" />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Status Message */}
+      {/* Generic Processing State */}
       {step !== 'done' && step !== 'error' && !showCreditPrompt && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-4 py-8"
+          className="text-center space-y-5 py-12"
         >
-          {/* Waveform animation */}
-          <div className="flex items-center justify-center gap-1 mb-2">
-            {Array.from({ length: 20 }).map((_, i) => (
-              <div
-                key={i}
-                className="w-1 bg-primary/30 rounded-full animate-pulse-glow"
-                style={{
-                  height: `${12 + Math.sin(i * 0.8) * 10}px`,
-                  animationDelay: `${i * 0.1}s`,
-                }}
-              />
-            ))}
-          </div>
+          <h2 className="text-xl font-semibold text-foreground">We&apos;re creating your video</h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            This usually takes about 10–15 minutes. Feel free to close this tab. We&apos;ll send you an email with the download link once it&apos;s ready.
+          </p>
 
-          <p className="text-sm text-muted-foreground">
-            {step === 'converting-pages' && 'Converting PDF pages to images...'}
-            {step === 'generating-scripts' && 'Generating narration scripts for each page...'}
-            {step === 'generating-videos' && `Generating videos... ${videosReady} of ${totalVideos} ready`}
-            {step === 'stitching' && 'Stitching all videos into one...'}
-          </p>
-          {step === 'generating-videos' && totalVideos > 0 && (
-            <div className="w-64 mx-auto bg-secondary rounded-full h-2 overflow-hidden">
-              <motion.div
-                className="bg-primary h-2 rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${(videosReady / totalVideos) * 100}%` }}
-                transition={{ duration: 0.5 }}
-              />
-            </div>
-          )}
-          {(step === 'generating-videos' || step === 'stitching') && (
-            <p className="text-xs text-muted-foreground">This may take several minutes</p>
-          )}
-          <p className="text-xs text-muted-foreground/70 mt-2">
-            We&apos;ll send you an email with the download link once your video is ready.
-          </p>
+          {/* Progress bar */}
+          <div className="w-72 mx-auto bg-secondary rounded-full h-2 overflow-hidden">
+            <motion.div
+              className="bg-primary h-2 rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${getProgressPercent()}%` }}
+              transition={{ duration: 1, ease: 'easeInOut' }}
+            />
+          </div>
         </motion.div>
       )}
 
