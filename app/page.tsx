@@ -61,8 +61,9 @@ export default function Home() {
       const params = new URLSearchParams(window.location.search);
       if (params.get('payment') === 'success') {
         setPaymentSuccess(true);
-        // Clean URL
-        window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+        // Clean URL and scroll to Try It Now section
+        window.history.replaceState({}, '', window.location.pathname + '#upload');
+        document.getElementById('upload')?.scrollIntoView({ behavior: 'smooth' });
         // Re-fetch credits after short delay for webhook processing
         setTimeout(async () => {
           const updated = await getCredits(authSession.user!.email!);
