@@ -39,6 +39,16 @@ export async function deductCredits(params: {
   }
 }
 
+export async function hasPurchased(email: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/credits/has-purchased?email=${encodeURIComponent(email)}`);
+    const data = await res.json();
+    return data.success ? data.hasPurchased : false;
+  } catch {
+    return false;
+  }
+}
+
 export async function createCheckoutSession(params: {
   user_email: string;
   plan: 'starter' | 'bestvalue' | 'business';

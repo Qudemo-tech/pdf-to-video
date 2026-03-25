@@ -75,9 +75,9 @@ export default function HeroSection() {
 
             <div className="flex flex-wrap gap-4 mb-10">
               <a href="#upload" className="btn-primary-glow inline-block">
-                Convert Your First PDF Free &rarr;
+                Convert Your First PDF &rarr;
               </a>
-              <a href="#demo" className="btn-ghost-outline inline-block">
+              <a href="#how-it-works" className="btn-ghost-outline inline-block">
                 See How It Works
               </a>
             </div>

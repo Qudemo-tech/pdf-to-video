@@ -7,23 +7,23 @@ const steps = [
   {
     icon: CloudUpload,
     title: 'Upload',
-    desc: 'Drag in any PDF, PPTX, or Google Slides link.',
+    desc: 'Upload or drag PDF file',
   },
   {
     icon: Sparkles,
     title: 'AI Processes',
-    desc: 'We analyze your content, generate a script, pick the right voice, add motion and music.',
+    desc: 'We analyze your content, generate a script, pick the right voice, add motion.',
   },
   {
     icon: Play,
     title: 'Download & Share',
-    desc: 'Get an MP4, share a link, or embed anywhere. Done.',
+    desc: 'Download MP4 file. Also get the video in your email',
   },
 ];
 
 export default function HowItWorks() {
   return (
-    <section className="section-padding">
+    <section id="how-it-works" className="section-padding">
       <div className="container mx-auto max-w-5xl">
         <motion.h2
           initial={{ opacity: 0, y: 20 }}

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { signIn, useSession } from 'next-auth/react';
-import { createCheckoutSession } from '@/lib/credits';
+import { createCheckoutSession, hasPurchased } from '@/lib/credits';
 
 const plans = [
   {
@@ -42,6 +42,13 @@ const plans = [
 export default function PricingSection() {
   const { data: session } = useSession();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [hasExistingPurchase, setHasExistingPurchase] = useState(false);
+
+  useEffect(() => {
+    if (session?.user?.email) {
+      hasPurchased(session.user.email).then(setHasExistingPurchase);
+    }
+  }, [session?.user?.email]);
 
   const handlePurchase = async (planId: 'starter' | 'bestvalue' | 'business') => {
     if (!session?.user?.email) {
@@ -122,7 +129,7 @@ export default function PricingSection() {
                     : 'bg-secondary text-foreground hover:bg-secondary/80'
                 }`}
               >
-                {loadingPlan === plan.planId ? 'Redirecting...' : plan.cta}
+                {loadingPlan === plan.planId ? 'Redirecting...' : hasExistingPurchase ? 'Add Credits' : plan.cta}
               </button>
             </motion.div>
           ))}

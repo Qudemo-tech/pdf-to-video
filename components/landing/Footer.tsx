@@ -8,7 +8,7 @@ export default function Footer() {
             Ready to stop boring your audience?
           </p>
           <a href="#upload" className="btn-primary-glow inline-block">
-            Convert Your First PDF Free &rarr;
+            Convert Your First PDF &rarr;
           </a>
         </div>
       </div>
