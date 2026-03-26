@@ -40,7 +40,7 @@ export default function Footer() {
               <ul className="space-y-2.5 text-sm text-muted-foreground">
                 <li><a href="#" className="hover:text-foreground transition-colors">About</a></li>
                 <li><a href="#" className="hover:text-foreground transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
+                <li><a href="mailto:support.pdftovideo@gmail.com" className="hover:text-foreground transition-colors">Contact</a></li>
               </ul>
             </div>
             <div>
